@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Live Quiz Poll</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Login Screen -->
+    <div id="admin-login-screen" class="container glass-card" style="margin-top: 10vh; max-width: 400px;">
+        <h1 style="font-size: 1.8rem; margin-bottom: 0.5rem;">Admin Login</h1>
+        <p style="text-align: center; color: #94a3b8; margin-bottom: 2rem;">Please enter your password to access the
+            control panel.</p>
+
+        <div class="form-group">
+            <input type="password" id="admin-password" placeholder="Password"
+                style="width: 100%; padding: 1rem; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 0.75rem; color: var(--text-color); font-size: 1rem;">
+        </div>
+
+        <button id="admin-login-btn">Login</button>
+    </div>
+
+    <div class="admin-container" id="admin-main-ui" style="display: none;">
+
+        <!-- Left Panel: Controls -->
+        <div class="glass-card">
+            <h2 style="display: flex; justify-content: space-between; align-items: center;">
+                Admin Control Panel
+                <span id="open-roster-btn"
+                    style="cursor: pointer; font-size: 0.9rem; font-weight: 500; background: rgba(99, 102, 241, 0.2); color: #818cf8; padding: 0.25rem 0.75rem; border-radius: 1rem; border: 1px solid rgba(99, 102, 241, 0.3); transition: background-color 0.2s;">
+                    Live Users: <span id="live-user-count">0</span>
+                </span>
+            </h2>
+
+            <div id="active-question-panel"
+                style="display: none; margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid var(--glass-border);">
+                <div class="live-indicator">
+                    <div class="live-dot"></div>
+                    <span>Active Session</span>
+                </div>
+                <div class="question-text" id="current-active-question" style="font-size: 1rem; margin-bottom: 1rem;">
+                </div>
+                <div class="timer" id="admin-countdown" style="font-size: 1.5rem; margin: 0 0 1rem 0;">60</div>
+                <button id="clear-btn" style="background-color: var(--error);">Clear Session</button>
+            </div>
+
+            <div class="form-group">
+                <label for="new-question">Ask a New Question</label>
+                <textarea id="new-question" placeholder="Enter your question here..."></textarea>
+            </div>
+
+            <div class="form-group" style="display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;">
+                <label for="question-duration" style="margin-bottom: 0;">Duration (Seconds):</label>
+                <input type="number" id="question-duration" value="60" min="10" max="3600"
+                    style="width: 100px; padding: 0.5rem; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 0.5rem; color: var(--text-color); font-size: 1rem;">
+            </div>
+
+            <button id="ask-btn" style="margin-bottom: 2rem;">Ask Question</button>
+
+            <div style="padding-top: 2rem; border-top: 1px solid var(--glass-border);">
+                <button id="export-btn" style="background-color: #10b981; color: white;">Export History to
+                    Excel</button>
+            </div>
+        </div>
+
+        <!-- Right Panel: Data Presentation -->
+        <div class="glass-card">
+            <h2 style="margin-bottom: 0.5rem; text-align: left;">
+                Results Data
+            </h2>
+
+            <div class="tabs">
+                <button class="tab-btn active" onclick="switchAdminTab('live')">Live Responses (<span
+                        id="response-count">0</span>)</button>
+                <button class="tab-btn" onclick="switchAdminTab('history')">Session History</button>
+            </div>
+
+            <!-- Live Tab Content -->
+            <div id="live-tab" class="tab-content active">
+                <div class="responses-list" id="responses-list">
+                    <div class="empty-state">No responses yet. Ask a question to start receiving answers!</div>
+                </div>
+            </div>
+
+            <!-- History Tab Content -->
+            <div id="history-tab" class="tab-content">
+                <div class="responses-list" id="admin-history-list">
+                    <div class="empty-state">No history recorded yet for this session.</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Roster Modal -->
+    <div id="roster-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 100; justify-content: center; align-items: center;">
+        <div class="glass-card" style="width: 100%; max-width: 400px; padding: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="margin: 0; font-size: 1.25rem;">Connected Participants</h3>
+                <button id="close-roster-btn"
+                    style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #94a3b8; padding: 0;">&times;</button>
+            </div>
+            <div id="roster-list"
+                style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+                <div style="color: #64748b; font-style: italic; text-align: center;">No one has joined yet.</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="admin.js?v=5"></script>
+</body>
+
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Quiz Poll</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container glass-card">
+
+        <!-- View 1: Name Entry -->
+        <div id="name-section" class="active">
+            <h1>Join the Poll</h1>
+            <p style="text-align: center; color: #94a3b8; margin-bottom: 2rem;">Enter your name to participate
+                anonymously.</p>
+            <div class="form-group">
+                <input type="text" id="username" placeholder="Your Name" autocomplete="off" autofocus>
+            </div>
+            <button id="join-btn">Join Now</button>
+        </div>
+
+        <!-- View 2: Waiting Room -->
+        <div id="waiting-section">
+            <h2 id="waiting-title">Waiting...</h2>
+            <div class="live-indicator" style="justify-content: center;">
+                <div class="live-dot"></div>
+                <span id="waiting-message">Waiting for the host to ask a question.</span>
+            </div>
+        </div>
+
+        <!-- View 3: Active Question -->
+        <div id="question-section">
+            <div class="live-indicator">
+                <div class="live-dot"></div>
+                <span>Live Question</span>
+            </div>
+            <div class="question-text" id="live-question">Loading question...</div>
+            <div class="timer" id="countdown">60</div>
+
+            <div class="form-group">
+                <textarea id="answer-input" placeholder="Type your answer here..."></textarea>
+            </div>
+            <button id="submit-btn">Submit Answer</button>
+        </div>
+
+        <!-- View 4: Submitted -->
+        <div id="submitted-section">
+            <h2 style="margin-bottom: 0.5rem;">Answer Submitted!</h2>
+            <div class="live-indicator" style="justify-content: center; margin-bottom: 2rem;">
+                <div class="live-dot" style="background-color: var(--success); animation: none;"></div>
+                <span style="color: var(--success);">Recorded</span>
+            </div>
+
+            <div class="question-text" id="submitted-question"
+                style="font-size: 1rem; color: #94a3b8; margin-bottom: 1rem;">
+                <!-- Question text goes here -->
+            </div>
+
+            <div
+                style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 0.75rem; padding: 1rem; margin-bottom: 2rem;">
+                <div style="font-size: 0.8rem; color: #10b981; margin-bottom: 0.5rem; font-weight: 600;">YOUR ANSWER
+                </div>
+                <div id="submitted-answer" style="font-size: 1rem; color: #f8fafc; white-space: pre-wrap;">
+                    <!-- Answer text goes here -->
+                </div>
+            </div>
+
+            <p style="text-align: center; color: #64748b; font-size: 0.9rem;">Please wait for the host to ask the next
+                question.</p>
+        </div>
+
+        <!-- History Panel (Always visible once joined, below main views) -->
+        <div id="history-panel"
+            style="display: none; margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--glass-border);">
+            <h3
+                style="font-size: 1.2rem; text-align: left; margin-bottom: 1rem; color: #94a3b8; background: none; -webkit-background-clip: unset; -webkit-text-fill-color: unset;">
+                Session History</h3>
+            <div id="history-list" style="display: flex; flex-direction: column; gap: 1rem;">
+                <!-- History items generate here -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js?v=8"></script>
+</body>
+
+</html>
