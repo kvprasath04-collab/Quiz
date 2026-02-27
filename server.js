@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const xlsx = require('xlsx');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -11,11 +12,38 @@ const io = new Server(server);
 // Serve static files from the public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Persistent Data Storage
+const DATA_FILE = path.join(__dirname, 'data.json');
+
 // Application State
 let activeQuestion = null;
 let timerEnd = null; // Timestamp when the question expires
 let responses = []; // Array of { name: string, answer: string, id: string }
 let history = []; // Array to store all past questions and responses
+
+// Load history from disk on startup
+try {
+    if (fs.existsSync(DATA_FILE)) {
+        const rawData = fs.readFileSync(DATA_FILE, 'utf8');
+        history = JSON.parse(rawData);
+        console.log(`Loaded ${history.length} historical sessions from data.json`);
+    } else {
+        // Create an empty file if it doesn't exist
+        fs.writeFileSync(DATA_FILE, JSON.stringify([]));
+    }
+} catch (error) {
+    console.error("Error loading data.json:", error);
+    history = [];
+}
+
+// Helper function to save history
+function saveHistory() {
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(history, null, 2));
+    } catch (error) {
+        console.error("Error saving to data.json:", error);
+    }
+}
 let connectedUsers = new Map(); // Map to store socket.id -> name
 
 const ADMIN_PASSWORD = 'Prasath_04';
@@ -64,6 +92,7 @@ io.on('connection', (socket) => {
                 responses: [...responses],
                 timestamp: new Date().toISOString()
             });
+            saveHistory(); // Persist to disk
         }
 
         const durationMs = (duration || 60) * 1000;
@@ -123,8 +152,30 @@ io.on('connection', (socket) => {
         activeQuestion = null;
         timerEnd = null;
         responses = [];
-        history = []; // Clear history too
         io.emit('session_cleared');
+    });
+
+    // Admin permanently deletes all history
+    socket.on('admin_delete_all_records', (password) => {
+        if (password !== ADMIN_PASSWORD) return;
+
+        history = [];
+        saveHistory(); // Clear the disk file
+
+        // Also clear the active question/responses since they asked to wipe everything
+        activeQuestion = null;
+        timerEnd = null;
+        responses = [];
+
+        io.emit('session_cleared');
+        // Sending an empty history forces admin UI to clear the table
+        socket.emit('admin_init', {
+            activeQuestion: null,
+            timerEnd: null,
+            serverTime: Date.now(),
+            responses: [],
+            history: []
+        });
     });
 
     socket.on('disconnect', () => {
@@ -147,10 +198,34 @@ app.get('/api/export', (req, res) => {
         }] : [];
 
         // Combine history and current data
-        const allData = [...history, ...currentData];
+        let allData = [...history, ...currentData];
+
+        // Apply Date Filtering
+        const { start, end } = req.query;
+        if (start || end) {
+            allData = allData.filter(session => {
+                const sessionDate = new Date(session.timestamp);
+
+                if (start) {
+                    const startDate = new Date(start);
+                    // Start of the provided day
+                    startDate.setHours(0, 0, 0, 0);
+                    if (sessionDate < startDate) return false;
+                }
+
+                if (end) {
+                    const endDate = new Date(end);
+                    // End of the provided day
+                    endDate.setHours(23, 59, 59, 999);
+                    if (sessionDate > endDate) return false;
+                }
+
+                return true;
+            });
+        }
 
         if (allData.length === 0) {
-            return res.status(400).send("No data to export.");
+            return res.status(400).send("No data to export for the given date range.");
         }
 
         // Format data into a flat structure for the Excel sheet

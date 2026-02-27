@@ -61,9 +61,35 @@
 
             <button id="ask-btn" style="margin-bottom: 2rem;">Ask Question</button>
 
-            <div style="padding-top: 2rem; border-top: 1px solid var(--glass-border);">
-                <button id="export-btn" style="background-color: #10b981; color: white;">Export History to
-                    Excel</button>
+            <div
+                style="padding-top: 2rem; border-top: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 1.5rem;">
+
+                <div
+                    style="background: rgba(0,0,0,0.1); padding: 1rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
+                    <h3
+                        style="font-size: 0.9rem; text-align: left; margin-bottom: 0.75rem; color: #cbd5e1; -webkit-background-clip: unset; -webkit-text-fill-color: unset;">
+                        Export Data</h3>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                        <div style="flex: 1;">
+                            <label for="export-start" style="font-size: 0.75rem;">From</label>
+                            <input type="date" id="export-start"
+                                style="width: 100%; padding: 0.5rem; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 0.5rem; color: var(--text-color); font-size: 0.85rem;" />
+                        </div>
+                        <div style="flex: 1;">
+                            <label for="export-end" style="font-size: 0.75rem;">To</label>
+                            <input type="date" id="export-end"
+                                style="width: 100%; padding: 0.5rem; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 0.5rem; color: var(--text-color); font-size: 0.85rem;" />
+                        </div>
+                    </div>
+                    <button id="export-btn" style="background-color: #10b981; color: white;">Export History to
+                        Excel</button>
+                </div>
+
+                <div style="text-align: right;">
+                    <button id="delete-all-btn"
+                        style="background-color: transparent; border: 1px solid var(--error); color: var(--error); padding: 0.5rem 1rem; font-size: 0.8rem; width: auto;">⚠️
+                        Delete All Records</button>
+                </div>
             </div>
         </div>
 

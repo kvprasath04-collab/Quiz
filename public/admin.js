@@ -17,6 +17,9 @@ const currentActiveQuestion = document.getElementById('current-active-question')
 const adminCountdown = document.getElementById('admin-countdown');
 const clearBtn = document.getElementById('clear-btn');
 const exportBtn = document.getElementById('export-btn');
+const exportStartInput = document.getElementById('export-start');
+const exportEndInput = document.getElementById('export-end');
+const deleteAllBtn = document.getElementById('delete-all-btn');
 const liveUserCount = document.getElementById('live-user-count');
 const openRosterBtn = document.getElementById('open-roster-btn');
 const closeRosterBtn = document.getElementById('close-roster-btn');
@@ -209,13 +212,31 @@ askBtn.addEventListener('click', () => {
 });
 
 clearBtn.addEventListener('click', () => {
-    if (confirm('Are you sure you want to clear the current session?')) {
+    if (confirm('Are you sure you want to clear the current active session?')) {
         socket.emit('admin_clear', passwordInput.value);
     }
 });
 
+deleteAllBtn.addEventListener('click', () => {
+    if (confirm('WARNING: Are you sure you want to PERMANENTLY delete ALL historical records? This cannot be undone.')) {
+        if (confirm('Are you absolutely certain?')) {
+            socket.emit('admin_delete_all_records', passwordInput.value);
+        }
+    }
+});
+
 exportBtn.addEventListener('click', () => {
-    window.location.href = '/api/export';
+    let url = '/api/export';
+    const params = new URLSearchParams();
+
+    if (exportStartInput.value) params.append('start', exportStartInput.value);
+    if (exportEndInput.value) params.append('end', exportEndInput.value);
+
+    if (params.toString()) {
+        url += '?' + params.toString();
+    }
+
+    window.location.href = url;
 });
 
 openRosterBtn.addEventListener('click', () => {
