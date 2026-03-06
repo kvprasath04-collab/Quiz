@@ -25,6 +25,7 @@ const openRosterBtn = document.getElementById('open-roster-btn');
 const closeRosterBtn = document.getElementById('close-roster-btn');
 const rosterModal = document.getElementById('roster-modal');
 const rosterList = document.getElementById('roster-list');
+const leaderboardList = document.getElementById('leaderboard-list');
 
 let currentResponses = [];
 let adminTimerInterval = null;
@@ -57,6 +58,10 @@ window.switchAdminTab = function (tabName) {
 
     event.target.classList.add('active');
     document.getElementById(`${tabName}-tab`).classList.add('active');
+
+    if (tabName === 'leaderboard') {
+        socket.emit('admin_get_leaderboard', passwordInput.value);
+    }
 };
 function updateResponsesList() {
     responseCountEl.textContent = currentResponses.length;
@@ -68,7 +73,7 @@ function updateResponsesList() {
 
     responsesList.innerHTML = '';
 
-    // Sort so newest are on top, or just append. Let's append to bottom for natural conversational flow, or top for newest. Let's do newest top.
+    // Sort so newest are on top
     const reversed = [...currentResponses].reverse();
 
     reversed.forEach(response => {
@@ -77,10 +82,24 @@ function updateResponsesList() {
         card.innerHTML = `
             <div class="response-name">${escapeHTML(response.name)}</div>
             <div class="response-text">${escapeHTML(response.answer)}</div>
+            <div class="mark-btn-container">
+                <button class="mark-btn correct ${response.isCorrect === true ? 'active' : ''}" 
+                    onclick="markResponse('${response.responseId}', true)">✅ Correct</button>
+                <button class="mark-btn incorrect ${response.isCorrect === false ? 'active' : ''}" 
+                    onclick="markResponse('${response.responseId}', false)">❌ Incorrect</button>
+            </div>
         `;
         responsesList.appendChild(card);
     });
 }
+
+window.markResponse = function (responseId, isCorrect) {
+    socket.emit('admin_mark_response', {
+        responseId,
+        isCorrect,
+        password: passwordInput.value
+    });
+};
 
 function escapeHTML(str) {
     return str.replace(/[&<>'"]/g,
@@ -138,7 +157,12 @@ function renderAdminHistory() {
                         <td style="color: #818cf8; font-weight: 500;">${qNumText}</td>
                         <td style="color: #e2e8f0;">${questionText}</td>
                         <td style="color: #94a3b8;">${escapeHTML(resp.name)}</td>
-                        <td style="color: #f8fafc; white-space: pre-wrap;">${escapeHTML(resp.answer)}</td>
+                        <td style="color: #f8fafc; white-space: pre-wrap;">
+                            <div style="margin-bottom: 0.5rem;">${escapeHTML(resp.answer)}</div>
+                            <div class="status-badge ${resp.isCorrect === true ? 'correct' : (resp.isCorrect === false ? 'incorrect' : 'pending')}">
+                                ${resp.isCorrect === true ? 'Correct' : (resp.isCorrect === false ? 'Incorrect' : 'Pending')}
+                            </div>
+                        </td>
                     </tr>
                 `;
             });
@@ -303,6 +327,62 @@ socket.on('new_response', (response) => {
     currentResponses.push(response);
     updateResponsesList();
 });
+
+socket.on('response_marked', ({ responseId, isCorrect }) => {
+    // Update local state if it's in current responses
+    const currentIdx = currentResponses.findIndex(r => r.responseId === responseId);
+    if (currentIdx !== -1) {
+        currentResponses[currentIdx].isCorrect = isCorrect;
+        updateResponsesList();
+    }
+
+    // Update history state
+    let historyChanged = false;
+    fullHistory.forEach(session => {
+        const hResp = session.responses.find(r => r.responseId === responseId);
+        if (hResp) {
+            hResp.isCorrect = isCorrect;
+            historyChanged = true;
+        }
+    });
+
+    if (historyChanged) {
+        renderAdminHistory();
+    }
+});
+
+socket.on('leaderboard_update', (data) => {
+    renderLeaderboard(data);
+});
+
+function renderLeaderboard(data) {
+    if (!data || data.length === 0) {
+        leaderboardList.innerHTML = '<div class="empty-state">No scores recorded yet. Correct answers to see the rankings!</div>';
+        return;
+    }
+
+    let html = `
+        <table class="leaderboard-table">
+            <tbody>
+    `;
+
+    data.forEach((item, idx) => {
+        html += `
+            <tr class="leaderboard-row">
+                <td class="leaderboard-rank">#${idx + 1}</td>
+                <td class="leaderboard-name">${escapeHTML(item.name)}</td>
+                <td class="leaderboard-score">${item.score} Points</td>
+            </tr>
+        `;
+    });
+
+    html += `
+            </tbody>
+        </table>
+    `;
+
+    leaderboardList.innerHTML = html;
+}
 
 socket.on('session_cleared', () => {
     activeQuestionPanel.style.display = 'none';

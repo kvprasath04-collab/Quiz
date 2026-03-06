@@ -318,3 +318,110 @@ table.data-table tbody tr {
 table.data-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.05);
 }
+
+/* Marking Buttons */
+.mark-btn-container {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.mark-btn {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  width: auto;
+  border-radius: 0.5rem;
+}
+
+.mark-btn.correct {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.mark-btn.incorrect {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.mark-btn.correct:hover {
+  background-color: rgba(16, 185, 129, 0.3);
+}
+
+.mark-btn.incorrect:hover {
+  background-color: rgba(239, 68, 68, 0.3);
+}
+
+.mark-btn.active.correct {
+  background-color: var(--success);
+  color: white;
+}
+
+.mark-btn.active.incorrect {
+  background-color: var(--error);
+  color: white;
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.correct {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.status-badge.incorrect {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.status-badge.pending {
+  background: rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+}
+
+/* Leaderboard */
+.leaderboard-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 0.5rem;
+}
+
+.leaderboard-row {
+  background: rgba(255, 255, 255, 0.03);
+  transition: transform 0.2s;
+}
+
+.leaderboard-row:hover {
+  transform: scale(1.02);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.leaderboard-row td {
+  padding: 1rem;
+}
+
+.leaderboard-rank {
+  font-weight: 800;
+  color: #818cf8;
+  width: 50px;
+  text-align: center;
+}
+
+.leaderboard-name {
+  font-weight: 600;
+}
+
+.leaderboard-score {
+  text-align: right;
+  font-weight: 700;
+  color: var(--success);
+}

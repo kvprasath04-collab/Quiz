@@ -103,6 +103,7 @@
                 <button class="tab-btn active" onclick="switchAdminTab('live')">Live Responses (<span
                         id="response-count">0</span>)</button>
                 <button class="tab-btn" onclick="switchAdminTab('history')">Session History</button>
+                <button class="tab-btn" onclick="switchAdminTab('leaderboard')">Leaderboard</button>
             </div>
 
             <!-- Live Tab Content -->
@@ -116,6 +117,13 @@
             <div id="history-tab" class="tab-content">
                 <div class="responses-list" id="admin-history-list">
                     <div class="empty-state">No history recorded yet for this session.</div>
+                </div>
+            </div>
+
+            <!-- Leaderboard Tab Content -->
+            <div id="leaderboard-tab" class="tab-content">
+                <div id="leaderboard-list">
+                    <div class="empty-state">No scores recorded yet.</div>
                 </div>
             </div>
         </div>

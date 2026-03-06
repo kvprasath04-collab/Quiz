@@ -133,7 +133,13 @@ io.on('connection', (socket) => {
         }
 
         // Add response
-        const newResponse = { name, answer, id: socket.id };
+        const newResponse = {
+            name,
+            answer,
+            id: socket.id,
+            responseId: `resp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            isCorrect: null // null = unmarked, true = correct, false = incorrect
+        };
         responses.push(newResponse);
 
         console.log(`Answer received from ${name}: ${answer}`);
@@ -143,6 +149,64 @@ io.on('connection', (socket) => {
 
         // Broadcast the new response to the admin only
         io.emit('new_response', newResponse);
+    });
+
+    // Admin marks a response as correct/incorrect
+    socket.on('admin_mark_response', ({ responseId, isCorrect, password }) => {
+        if (password !== ADMIN_PASSWORD) return;
+
+        // Check current responses
+        let found = false;
+        const resp = responses.find(r => r.responseId === responseId);
+        if (resp) {
+            resp.isCorrect = isCorrect;
+            found = true;
+        } else {
+            // Check history
+            for (let session of history) {
+                const hResp = session.responses.find(r => r.responseId === responseId);
+                if (hResp) {
+                    hResp.isCorrect = isCorrect;
+                    found = true;
+                    saveHistory();
+                    break;
+                }
+            }
+        }
+
+        if (found) {
+            io.emit('response_marked', { responseId, isCorrect });
+            // Broadcast leaderboard update
+            io.emit('leaderboard_update', calculateLeaderboard());
+        }
+    });
+
+    function calculateLeaderboard() {
+        const scores = new Map();
+
+        const processResponses = (resps) => {
+            resps.forEach(r => {
+                if (r.isCorrect === true) {
+                    scores.set(r.name, (scores.get(r.name) || 0) + 1);
+                }
+            });
+        };
+
+        // Process history
+        history.forEach(session => processResponses(session.responses));
+        // Process current
+        processResponses(responses);
+
+        // Convert to array and sort
+        return Array.from(scores.entries())
+            .map(([name, score]) => ({ name, score }))
+            .sort((a, b) => b.score - a.score);
+    }
+
+    // Admin requests leaderboard
+    socket.on('admin_get_leaderboard', (password) => {
+        if (password !== ADMIN_PASSWORD) return;
+        socket.emit('leaderboard_update', calculateLeaderboard());
     });
 
     // Admin clears the current session
