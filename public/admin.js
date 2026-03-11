@@ -40,6 +40,7 @@ loginBtn.addEventListener('click', () => {
 
         // Initialization only after login
         socket.emit('admin_join', pw);
+        socket.emit('admin_get_leaderboard', pw); // Populate the persistent leaderboard
     } else {
         alert('Incorrect password');
         passwordInput.value = '';
@@ -58,10 +59,6 @@ window.switchAdminTab = function (tabName) {
 
     event.target.classList.add('active');
     document.getElementById(`${tabName}-tab`).classList.add('active');
-
-    if (tabName === 'leaderboard') {
-        socket.emit('admin_get_leaderboard', passwordInput.value);
-    }
 };
 function updateResponsesList() {
     responseCountEl.textContent = currentResponses.length;
@@ -84,9 +81,9 @@ function updateResponsesList() {
             <div class="response-text">${escapeHTML(response.answer)}</div>
             <div class="mark-btn-container">
                 <button class="mark-btn correct ${response.isCorrect === true ? 'active' : ''}" 
-                    onclick="markResponse('${response.responseId}', true)">✅ Correct</button>
+                    onclick="markResponse('${response.responseId}', ${response.isCorrect === true ? 'null' : 'true'})">✅ Correct</button>
                 <button class="mark-btn incorrect ${response.isCorrect === false ? 'active' : ''}" 
-                    onclick="markResponse('${response.responseId}', false)">❌ Incorrect</button>
+                    onclick="markResponse('${response.responseId}', ${response.isCorrect === false ? 'null' : 'false'})">❌ Incorrect</button>
             </div>
         `;
         responsesList.appendChild(card);

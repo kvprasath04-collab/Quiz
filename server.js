@@ -20,6 +20,7 @@ let activeQuestion = null;
 let timerEnd = null; // Timestamp when the question expires
 let responses = []; // Array of { name: string, answer: string, id: string }
 let history = []; // Array to store all past questions and responses
+let sessionStartTime = Date.now(); // Timestamp to start calculating scores from
 
 // Load history from disk on startup
 try {
@@ -192,9 +193,14 @@ io.on('connection', (socket) => {
             });
         };
 
-        // Process history
-        history.forEach(session => processResponses(session.responses));
-        // Process current
+        // Process only history items that occurred after sessionStartTime
+        history.forEach(session => {
+            if (new Date(session.timestamp).getTime() >= sessionStartTime) {
+                processResponses(session.responses);
+            }
+        });
+        
+        // Process current active responses
         processResponses(responses);
 
         // Convert to array and sort
@@ -213,10 +219,25 @@ io.on('connection', (socket) => {
     socket.on('admin_clear', (password) => {
         if (password !== ADMIN_PASSWORD) return;
 
+        // Archive the question first if it exists
+        if (activeQuestion) {
+            history.push({
+                question: activeQuestion,
+                responses: [...responses],
+                timestamp: new Date().toISOString()
+            });
+            saveHistory(); // Persist to disk
+        }
+
         activeQuestion = null;
         timerEnd = null;
         responses = [];
+        
+        // Reset scores start time
+        sessionStartTime = Date.now();
+        
         io.emit('session_cleared');
+        io.emit('leaderboard_update', calculateLeaderboard()); // Broadcast that the leaderboard is now empty
     });
 
     // Admin permanently deletes all history
