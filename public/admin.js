@@ -152,13 +152,11 @@ function renderAdminHistory() {
                 tableHtml += `
                     <tr>
                         <td style="color: #818cf8; font-weight: 500;">${qNumText}</td>
-                        <td style="color: #e2e8f0;">${questionText}</td>
+                        <td style="color: #e2e8f0; white-space: pre-wrap;">${questionText}</td>
                         <td style="color: #94a3b8;">${escapeHTML(resp.name)}</td>
-                        <td style="color: #f8fafc; white-space: pre-wrap;">
-                            <div style="margin-bottom: 0.5rem;">${escapeHTML(resp.answer)}</div>
-                            <div class="status-badge ${resp.isCorrect === true ? 'correct' : (resp.isCorrect === false ? 'incorrect' : 'pending')}">
-                                ${resp.isCorrect === true ? 'Correct' : (resp.isCorrect === false ? 'Incorrect' : 'Pending')}
-                            </div>
+                        <td style="color: #f8fafc;">
+                            <div style="margin-bottom: 0.5rem; white-space: pre-wrap; word-break: break-word;">${escapeHTML(resp.answer)}</div>
+                            <div class="status-badge ${resp.isCorrect === true ? 'correct' : (resp.isCorrect === false ? 'incorrect' : 'pending')}">${resp.isCorrect === true ? 'Correct' : (resp.isCorrect === false ? 'Incorrect' : 'Pending')}</div>
                         </td>
                     </tr>
                 `;
