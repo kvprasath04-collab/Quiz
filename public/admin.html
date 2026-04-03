@@ -105,10 +105,16 @@
                 Results Data
             </h2>
 
-            <div class="tabs">
-                <button class="tab-btn active" onclick="switchAdminTab('live')">Live Responses (<span
-                        id="response-count">0</span>)</button>
-                <button class="tab-btn" onclick="switchAdminTab('history')">Session History</button>
+            <div class="tabs" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <button class="tab-btn active" onclick="switchAdminTab('live')">Live Responses (<span
+                            id="response-count">0</span>)</button>
+                    <button class="tab-btn" onclick="switchAdminTab('history')">Session History</button>
+                </div>
+                <label style="font-size: 0.85rem; color: #cbd5e1; display:flex; align-items: center; gap: 0.5rem; padding-right: 1rem; cursor: pointer;">
+                   <input type="checkbox" id="filter-correct-btn" style="accent-color: #10b981;"> 
+                   Show only correct
+                </label>
             </div>
 
             <!-- Live Tab Content -->

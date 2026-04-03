@@ -31,8 +31,10 @@ const imagePreviewContainer = document.getElementById('image-preview-container')
 const imagePreview = document.getElementById('image-preview');
 const removeImageBtn = document.getElementById('remove-image-btn');
 const currentActiveImage = document.getElementById('current-active-image');
+const filterCorrectBtn = document.getElementById('filter-correct-btn');
 
 let currentImageBase64 = null;
+let showOnlyCorrect = false;
 
 let currentResponses = [];
 let adminTimerInterval = null;
@@ -124,19 +126,29 @@ removeImageBtn.addEventListener('click', () => {
     imagePreviewContainer.style.display = 'none';
 });
 
+if (filterCorrectBtn) {
+    filterCorrectBtn.addEventListener('change', (e) => {
+        showOnlyCorrect = e.target.checked;
+        updateResponsesList();
+    });
+}
 
 function updateResponsesList() {
-    responseCountEl.textContent = currentResponses.length;
+    const filteredResponses = showOnlyCorrect 
+        ? currentResponses.filter(r => r.isCorrect === true) 
+        : currentResponses;
 
-    if (currentResponses.length === 0) {
-        responsesList.innerHTML = '<div class="empty-state">No responses yet. Waiting for answers...</div>';
+    responseCountEl.textContent = filteredResponses.length;
+
+    if (filteredResponses.length === 0) {
+        responsesList.innerHTML = `<div class="empty-state">${showOnlyCorrect ? 'No responses marked as correct yet.' : 'No responses yet. Waiting for answers...'}</div>`;
         return;
     }
 
     responsesList.innerHTML = '';
 
     // Sort so newest are on top
-    const reversed = [...currentResponses].reverse();
+    const reversed = [...filteredResponses].reverse();
 
     reversed.forEach(response => {
         const card = document.createElement('div');
