@@ -146,6 +146,7 @@ function updateResponsesList() {
     }
 
     responsesList.innerHTML = '';
+    const fragment = document.createDocumentFragment();
 
     // Sort so newest are on top
     const reversed = [...filteredResponses].reverse();
@@ -163,11 +164,20 @@ function updateResponsesList() {
                     onclick="markResponse('${response.responseId}', ${response.isCorrect === false ? 'null' : 'false'})">❌ Incorrect</button>
             </div>
         `;
-        responsesList.appendChild(card);
+        fragment.appendChild(card);
     });
+    
+    responsesList.appendChild(fragment);
 }
 
 window.markResponse = function (responseId, isCorrect) {
+    // Optimistic UI for instant feedback
+    const target = currentResponses.find(r => r.responseId === responseId);
+    if (target) {
+        target.isCorrect = isCorrect;
+        updateResponsesList(); 
+    }
+
     socket.emit('admin_mark_response', {
         responseId,
         isCorrect,

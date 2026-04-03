@@ -133,6 +133,12 @@ io.on('connection', (socket) => {
             return;
         }
 
+        // Prevent duplicate answers by the same user to avoid duplicate score accumulation
+        if (responses.some(r => r.name === name)) {
+            socket.emit('submission_error', { message: 'You have already submitted an answer for this question.' });
+            return;
+        }
+
         // Guarantee the user is in the roster (fallback for stale clients)
         if (!connectedUsers.has(socket.id)) {
             connectedUsers.set(socket.id, name);
