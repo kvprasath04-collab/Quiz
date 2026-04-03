@@ -44,13 +44,19 @@
                 </div>
                 <div class="question-text" id="current-active-question" style="font-size: 1rem; margin-bottom: 1rem;">
                 </div>
+                <img id="current-active-image" src="" alt="Active Image" style="display: none; max-width: 100%; max-height: 200px; border-radius: 0.5rem; margin-bottom: 1rem; border: 1px solid var(--glass-border);">
                 <div class="timer" id="admin-countdown" style="font-size: 1.5rem; margin: 0 0 1rem 0;">60</div>
                 <button id="clear-btn" style="background-color: var(--error);">Clear Session</button>
             </div>
 
             <div class="form-group">
                 <label for="new-question">Ask a New Question</label>
-                <textarea id="new-question" placeholder="Enter your question here..."></textarea>
+                <textarea id="new-question" placeholder="Enter your question here... (Paste an image to include one)"></textarea>
+                
+                <div id="image-preview-container" style="display: none; margin-top: 1rem; position: relative; max-width: max-content;">
+                    <img id="image-preview" src="" alt="Pasted Image Preview" style="max-width: 100%; max-height: 200px; border-radius: 0.5rem; border: 1px solid var(--glass-border);">
+                    <button id="remove-image-btn" style="position: absolute; top: -10px; right: -10px; background: var(--error); color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; padding: 0;">&times;</button>
+                </div>
             </div>
 
             <div class="form-group" style="display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;">

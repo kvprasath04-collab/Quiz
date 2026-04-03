@@ -27,6 +27,13 @@ const rosterModal = document.getElementById('roster-modal');
 const rosterList = document.getElementById('roster-list');
 const leaderboardList = document.getElementById('leaderboard-list');
 
+const imagePreviewContainer = document.getElementById('image-preview-container');
+const imagePreview = document.getElementById('image-preview');
+const removeImageBtn = document.getElementById('remove-image-btn');
+const currentActiveImage = document.getElementById('current-active-image');
+
+let currentImageBase64 = null;
+
 let currentResponses = [];
 let adminTimerInterval = null;
 let fullHistory = [];
@@ -60,6 +67,64 @@ window.switchAdminTab = function (tabName) {
     event.target.classList.add('active');
     document.getElementById(`${tabName}-tab`).classList.add('active');
 };
+
+// Image Pasting Logic
+newQuestionInput.addEventListener('paste', (e) => {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (const item of items) {
+        if (item.type.indexOf('image') === 0) {
+            e.preventDefault(); // Prevent default paste if we handle it
+            const file = item.getAsFile();
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    // Compress image if it's too large
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800;
+                    const MAX_HEIGHT = 800;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Get base64 string
+                    currentImageBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    // Show preview
+                    imagePreview.src = currentImageBase64;
+                    imagePreviewContainer.style.display = 'block';
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+});
+
+removeImageBtn.addEventListener('click', () => {
+    currentImageBase64 = null;
+    imagePreview.src = '';
+    imagePreviewContainer.style.display = 'none';
+});
+
+
 function updateResponsesList() {
     responseCountEl.textContent = currentResponses.length;
 
@@ -136,10 +201,11 @@ function renderAdminHistory() {
         const questionNum = fullHistory.length - idx;
 
         if (session.responses.length === 0) {
+            const imageHtml = session.image ? `<br><img src="${session.image}" style="max-height: 100px; max-width: 100%; border-radius: 0.5rem; margin-top: 0.5rem; border: 1px solid rgba(255,255,255,0.1);">` : '';
             tableHtml += `
             <tr>
                 <td style="color: #818cf8; font-weight: 500;">Q${questionNum}</td>
-                <td style="color: #e2e8f0;">${escapeHTML(session.question)}</td>
+                <td style="color: #e2e8f0; vertical-align: top;">${escapeHTML(session.question)}${imageHtml}</td>
                 <td colspan="2" style="color: #64748b; font-style: italic;">No responses recorded</td>
             </tr>
             `;
@@ -147,12 +213,13 @@ function renderAdminHistory() {
             session.responses.forEach((resp, rIdx) => {
                 // Only print the question text on the first row for this question
                 const questionText = rIdx === 0 ? escapeHTML(session.question) : '';
+                const imageHtml = (rIdx === 0 && session.image) ? `<br><img src="${session.image}" style="max-height: 100px; max-width: 100%; border-radius: 0.5rem; margin-top: 0.5rem; border: 1px solid rgba(255,255,255,0.1);">` : '';
                 const qNumText = rIdx === 0 ? `Q${questionNum}` : '';
 
                 tableHtml += `
                     <tr>
                         <td style="color: #818cf8; font-weight: 500;">${qNumText}</td>
-                        <td style="color: #e2e8f0; white-space: pre-wrap;">${questionText}</td>
+                        <td style="color: #e2e8f0; white-space: pre-wrap; vertical-align: top;">${questionText}${imageHtml}</td>
                         <td style="color: #94a3b8;">${escapeHTML(resp.name)}</td>
                         <td style="color: #f8fafc;">
                             <div style="margin-bottom: 0.5rem; white-space: pre-wrap; word-break: break-word;">${escapeHTML(resp.answer)}</div>
@@ -201,9 +268,18 @@ function startAdminTimer(targetTimeServer, serverTimeOrigin) {
     updateTimer();
 }
 
-function setActiveQuestionState(question, timerEnd, serverTime) {
+function setActiveQuestionState(question, image, timerEnd, serverTime) {
     activeQuestionPanel.style.display = 'block';
     currentActiveQuestion.textContent = question;
+
+    if (image) {
+        currentActiveImage.src = image;
+        currentActiveImage.style.display = 'block';
+    } else {
+        currentActiveImage.style.display = 'none';
+        currentActiveImage.src = '';
+    }
+
     newQuestionInput.value = '';
     startAdminTimer(timerEnd, serverTime);
 }
@@ -221,11 +297,15 @@ askBtn.addEventListener('click', () => {
     // Emit start question
     socket.emit('admin_start_question', {
         question,
+        image: currentImageBase64,
         duration: durationSeconds,
         password: passwordInput.value
     });
 
     // Local optimisic update
+    currentImageBase64 = null;
+    imagePreviewContainer.style.display = 'none';
+    imagePreview.src = '';
     currentResponses = [];
     updateResponsesList();
 });
@@ -279,7 +359,7 @@ socket.on('admin_init', (state) => {
     renderAdminHistory();
 
     if (state.activeQuestion) {
-        setActiveQuestionState(state.activeQuestion, state.timerEnd, state.serverTime);
+        setActiveQuestionState(state.activeQuestion, state.activeImage, state.timerEnd, state.serverTime);
         currentResponses = state.responses || [];
         updateResponsesList();
     }
@@ -309,7 +389,7 @@ socket.on('roster_update', (names) => {
 });
 
 socket.on('new_question', (data) => {
-    setActiveQuestionState(data.question, data.timerEnd, data.serverTime);
+    setActiveQuestionState(data.question, data.image, data.timerEnd, data.serverTime);
     currentResponses = [];
     updateResponsesList();
 

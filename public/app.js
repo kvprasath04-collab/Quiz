@@ -21,9 +21,11 @@ const submitBtn = document.getElementById('submit-btn');
 const answerInput = document.getElementById('answer-input');
 const liveQuestionEl = document.getElementById('live-question');
 const countdownEl = document.getElementById('countdown');
+const liveQuestionImageEl = document.getElementById('live-question-image');
 const waitingTitle = document.getElementById('waiting-title');
 const waitingMessage = document.getElementById('waiting-message');
 const submittedQuestionEl = document.getElementById('submitted-question');
+const submittedQuestionImageEl = document.getElementById('submitted-question-image');
 const submittedAnswerEl = document.getElementById('submitted-answer');
 const historyPanel = document.getElementById('history-panel');
 const historyList = document.getElementById('history-list');
@@ -77,6 +79,13 @@ function startTimer(targetTimeServer, serverTimeOrigin) {
 
                     // Add optimistic UI to the submitted view
                     submittedQuestionEl.textContent = liveQuestionEl.textContent;
+                    if (liveQuestionImageEl.style.display === 'block') {
+                        submittedQuestionImageEl.src = liveQuestionImageEl.src;
+                        submittedQuestionImageEl.style.display = 'block';
+                    } else {
+                        submittedQuestionImageEl.style.display = 'none';
+                        submittedQuestionImageEl.src = '';
+                    }
                     submittedAnswerEl.textContent = finalAnswer;
 
                     socket.emit('user_submit_answer', {
@@ -91,6 +100,13 @@ function startTimer(targetTimeServer, serverTimeOrigin) {
 
                     // Set submitted view for empty answer
                     submittedQuestionEl.textContent = liveQuestionEl.textContent;
+                    if (liveQuestionImageEl.style.display === 'block') {
+                        submittedQuestionImageEl.src = liveQuestionImageEl.src;
+                        submittedQuestionImageEl.style.display = 'block';
+                    } else {
+                        submittedQuestionImageEl.style.display = 'none';
+                        submittedQuestionImageEl.src = '';
+                    }
                     submittedAnswerEl.textContent = "No answer provided (Time Out).";
 
                     // Auto switch to submitted after a short delay
@@ -138,6 +154,13 @@ submitBtn.addEventListener('click', () => {
 
     // Local UI update before server confirmation to avoid UI jumping
     submittedQuestionEl.textContent = liveQuestionEl.textContent;
+    if (liveQuestionImageEl.style.display === 'block') {
+        submittedQuestionImageEl.src = liveQuestionImageEl.src;
+        submittedQuestionImageEl.style.display = 'block';
+    } else {
+        submittedQuestionImageEl.style.display = 'none';
+        submittedQuestionImageEl.src = '';
+    }
     submittedAnswerEl.textContent = answer;
 
     // Emit to server
@@ -171,7 +194,7 @@ socket.on('current_state', (state) => {
 
         if (localEndTime > Date.now()) {
             hasAnsweredCurrentQuestion = false;
-            startQuestion(state.activeQuestion, state.timerEnd, state.serverTime);
+            startQuestion(state.activeQuestion, state.activeImage, state.timerEnd, state.serverTime);
             return;
         }
     }
@@ -187,7 +210,7 @@ socket.on('new_question', (data) => {
     }
 
     hasAnsweredCurrentQuestion = false;
-    startQuestion(data.question, data.timerEnd, data.serverTime);
+    startQuestion(data.question, data.image, data.timerEnd, data.serverTime);
 });
 
 socket.on('submission_success', () => {
@@ -210,8 +233,17 @@ socket.on('session_cleared', () => {
     }
 });
 
-function startQuestion(question, timerEnd, serverTime) {
+function startQuestion(question, image, timerEnd, serverTime) {
     liveQuestionEl.textContent = question;
+    
+    if (image) {
+        liveQuestionImageEl.src = image;
+        liveQuestionImageEl.style.display = 'block';
+    } else {
+        liveQuestionImageEl.style.display = 'none';
+        liveQuestionImageEl.src = '';
+    }
+
     answerInput.value = '';
     answerInput.disabled = false;
     submitBtn.disabled = false;
@@ -252,11 +284,13 @@ function renderHistory(historyData, currentUserName) {
         const answerText = userResponse ? userResponse.answer : "Did not answer";
         const answerColor = userResponse ? "#f8fafc" : "#64748b";
         const questionNumber = historyData.length - idx;
+        const questionHtml = escapeHTML(session.question);
+        const imageHtml = session.image ? `<br><img src="${session.image}" style="max-height: 100px; max-width: 100%; border-radius: 0.5rem; margin-top: 0.5rem; border: 1px solid rgba(255,255,255,0.1);">` : '';
 
         tableHtml += `
             <tr>
                 <td style="color: #818cf8; font-weight: 500;">Q${questionNumber}</td>
-                <td>${escapeHTML(session.question)}</td>
+                <td>${questionHtml}${imageHtml}</td>
                 <td style="color: ${answerColor}; white-space: pre-wrap;">${escapeHTML(answerText)}</td>
             </tr>
         `;

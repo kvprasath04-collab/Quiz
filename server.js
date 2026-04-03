@@ -17,6 +17,7 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 
 // Application State
 let activeQuestion = null;
+let activeImage = null;
 let timerEnd = null; // Timestamp when the question expires
 let responses = []; // Array of { name: string, answer: string, id: string }
 let history = []; // Array to store all past questions and responses
@@ -64,6 +65,7 @@ io.on('connection', (socket) => {
     // When a user connects, send them the current state
     socket.emit('current_state', {
         activeQuestion,
+        activeImage,
         timerEnd,
         serverTime: Date.now(),
         history // Send full history on join
@@ -75,6 +77,7 @@ io.on('connection', (socket) => {
 
         socket.emit('admin_init', {
             activeQuestion,
+            activeImage,
             timerEnd,
             serverTime: Date.now(),
             responses
@@ -83,13 +86,14 @@ io.on('connection', (socket) => {
     });
 
     // Admin starts a new question
-    socket.on('admin_start_question', ({ question, duration, password }) => {
+    socket.on('admin_start_question', ({ question, image, duration, password }) => {
         if (password !== ADMIN_PASSWORD) return;
 
         // Archive the previous active question before starting a new one
         if (activeQuestion) {
             history.push({
                 question: activeQuestion,
+                image: activeImage,
                 responses: [...responses],
                 timestamp: new Date().toISOString()
             });
@@ -98,14 +102,16 @@ io.on('connection', (socket) => {
 
         const durationMs = (duration || 60) * 1000;
 
-        console.log(`New question asked: ${question} for ${duration}s`);
+        console.log(`New question asked: ${question} for ${duration}s (Has Image: ${!!image})`);
         activeQuestion = question;
+        activeImage = image;
         timerEnd = Date.now() + durationMs;
         responses = []; // Reset responses for the new question
 
         // Broadcast the new question to all connected clients
         io.emit('new_question', {
             question,
+            image: activeImage,
             timerEnd,
             serverTime: Date.now(),
             history // Send updated history
@@ -223,6 +229,7 @@ io.on('connection', (socket) => {
         if (activeQuestion) {
             history.push({
                 question: activeQuestion,
+                image: activeImage,
                 responses: [...responses],
                 timestamp: new Date().toISOString()
             });
@@ -230,6 +237,7 @@ io.on('connection', (socket) => {
         }
 
         activeQuestion = null;
+        activeImage = null;
         timerEnd = null;
         responses = [];
         
@@ -249,6 +257,7 @@ io.on('connection', (socket) => {
 
         // Also clear the active question/responses since they asked to wipe everything
         activeQuestion = null;
+        activeImage = null;
         timerEnd = null;
         responses = [];
 
@@ -256,6 +265,7 @@ io.on('connection', (socket) => {
         // Sending an empty history forces admin UI to clear the table
         socket.emit('admin_init', {
             activeQuestion: null,
+            activeImage: null,
             timerEnd: null,
             serverTime: Date.now(),
             responses: [],
@@ -278,6 +288,7 @@ app.get('/api/export', (req, res) => {
         // Prepare the dataset for the current active question if there is one
         const currentData = activeQuestion ? [{
             question: activeQuestion,
+            image: activeImage,
             responses: [...responses],
             timestamp: new Date().toISOString()
         }] : [];
