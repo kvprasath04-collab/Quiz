@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 const xlsx = require('xlsx');
 const fs = require('fs');
+const mongoose = require('mongoose');
 
 const app = express();
 const server = http.createServer(app);
@@ -16,6 +17,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 const dataDir = process.env.DATA_DIR || __dirname;
 const DATA_FILE = path.join(dataDir, 'data.json');
 
+const MONGODB_URI = process.env.MONGODB_URI || null;
+const SessionHistory = mongoose.model('SessionHistory', new mongoose.Schema({}, { strict: false }));
+
 // Application State
 let activeQuestion = null;
 let activeImage = null;
@@ -24,27 +28,54 @@ let responses = []; // Array of { name: string, answer: string, id: string }
 let history = []; // Array to store all past questions and responses
 let sessionStartTime = Date.now(); // Timestamp to start calculating scores from
 
-// Load history from disk on startup
-try {
-    if (fs.existsSync(DATA_FILE)) {
-        const rawData = fs.readFileSync(DATA_FILE, 'utf8');
-        history = JSON.parse(rawData);
-        console.log(`Loaded ${history.length} historical sessions from data.json`);
+// Load history from disk or Mongo on startup
+async function initHistory() {
+    if (MONGODB_URI) {
+        try {
+            await mongoose.connect(MONGODB_URI);
+            console.log("Connected to MongoDB Cloud Database!");
+            const dbHistory = await SessionHistory.find({}).sort({ timestamp: 1 });
+            history = dbHistory.map(doc => doc.toObject());
+            console.log(`Loaded ${history.length} historical sessions from MongoDB`);
+        } catch (error) {
+            console.error("Error connecting to MongoDB:", error);
+            history = [];
+        }
     } else {
-        // Create an empty file if it doesn't exist
-        fs.writeFileSync(DATA_FILE, JSON.stringify([]));
+        try {
+            if (fs.existsSync(DATA_FILE)) {
+                const rawData = fs.readFileSync(DATA_FILE, 'utf8');
+                history = JSON.parse(rawData);
+                console.log(`Loaded ${history.length} historical sessions from data.json`);
+            } else {
+                fs.writeFileSync(DATA_FILE, JSON.stringify([]));
+            }
+        } catch (error) {
+            console.error("Error loading data.json:", error);
+            history = [];
+        }
     }
-} catch (error) {
-    console.error("Error loading data.json:", error);
-    history = [];
 }
+initHistory();
 
 // Helper function to save history
-function saveHistory() {
-    try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(history, null, 2));
-    } catch (error) {
-        console.error("Error saving to data.json:", error);
+async function saveHistory() {
+    if (MONGODB_URI) {
+        try {
+            // Synchronize the memory array precisely to the cloud collection
+            await SessionHistory.deleteMany({});
+            if (history.length > 0) {
+                await SessionHistory.insertMany(history);
+            }
+        } catch (error) {
+            console.error("Error saving to MongoDB:", error);
+        }
+    } else {
+        try {
+            fs.writeFileSync(DATA_FILE, JSON.stringify(history, null, 2));
+        } catch (error) {
+            console.error("Error saving to data.json:", error);
+        }
     }
 }
 let connectedUsers = new Map(); // Map to store socket.id -> name
