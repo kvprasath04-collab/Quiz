@@ -286,6 +286,22 @@ socket.on('leaderboard_update', (data) => {
     }
 });
 
+socket.on('response_marked', ({ responseId, isCorrect, phone }) => {
+    if (userName && userPhone && phone === userPhone) {
+        // Did we just get marked as Correct?
+        if (isCorrect === true) {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 150,
+                    spread: 80,
+                    origin: { y: 0.6 },
+                    colors: ['#10b981', '#fcd34d', '#indigo']
+                });
+            }
+        }
+    }
+});
+
 function startQuestion(question, image, timerEnd, serverTime) {
     liveQuestionEl.textContent = question;
     

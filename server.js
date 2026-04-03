@@ -120,10 +120,14 @@ async function saveState() {
         }
     } else {
         try {
-            fs.writeFileSync(DATA_FILE, JSON.stringify(history, null, 2));
-            fs.writeFileSync(STATE_FILE, JSON.stringify(currentStateObj, null, 2));
+            fs.writeFile(DATA_FILE, JSON.stringify(history, null, 2), err => {
+                if (err) console.error("Error saving strictly local data:", err);
+            });
+            fs.writeFile(STATE_FILE, JSON.stringify(currentStateObj, null, 2), err => {
+                if (err) console.error("Error saving strictly local state:", err);
+            });
         } catch (error) {
-            console.error("Error saving strictly local files:", error);
+            console.error("Error initiating local save:", error);
         }
     }
 }
@@ -259,11 +263,11 @@ io.on('connection', (socket) => {
         if (password !== ADMIN_PASSWORD) return;
 
         // Check current responses
-        let found = false;
+        let foundResp = null;
         const resp = responses.find(r => r.responseId === responseId);
         if (resp) {
             resp.isCorrect = isCorrect;
-            found = true;
+            foundResp = resp;
             saveState();
         } else {
             // Check history
@@ -271,15 +275,15 @@ io.on('connection', (socket) => {
                 const hResp = session.responses.find(r => r.responseId === responseId);
                 if (hResp) {
                     hResp.isCorrect = isCorrect;
-                    found = true;
+                    foundResp = hResp;
                     saveState();
                     break;
                 }
             }
         }
 
-        if (found) {
-            io.emit('response_marked', { responseId, isCorrect });
+        if (foundResp) {
+            io.emit('response_marked', { responseId, isCorrect, phone: foundResp.phone });
             // Broadcast leaderboard update
             io.emit('leaderboard_update', calculateLeaderboard());
         }
