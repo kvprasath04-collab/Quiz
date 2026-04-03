@@ -12,8 +12,9 @@ const io = new Server(server);
 // Serve static files from the public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Persistent Data Storage
-const DATA_FILE = path.join(__dirname, 'data.json');
+// Persistent Data Storage (Supports Render Disks via DATA_DIR environment variable)
+const dataDir = process.env.DATA_DIR || __dirname;
+const DATA_FILE = path.join(dataDir, 'data.json');
 
 // Application State
 let activeQuestion = null;
