@@ -46,7 +46,7 @@
                 </div>
                 <img id="current-active-image" src="" alt="Active Image" style="display: none; max-width: 100%; max-height: 200px; border-radius: 0.5rem; margin-bottom: 1rem; border: 1px solid var(--glass-border);">
                 <div class="timer" id="admin-countdown" style="font-size: 1.5rem; margin: 0 0 1rem 0;">60</div>
-                <button id="clear-btn" style="background-color: var(--error);">Clear Session</button>
+                <button id="clear-btn" style="background-color: var(--error);">Clear Active Question</button>
             </div>
 
             <div class="form-group">
@@ -69,6 +69,12 @@
 
             <div
                 style="padding-top: 2rem; border-top: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 1.5rem;">
+
+                <div style="background: rgba(245, 158, 11, 0.1); padding: 1rem; border-radius: 0.75rem; border: 1px solid rgba(245, 158, 11, 0.2);">
+                    <h3 style="font-size: 0.9rem; text-align: left; margin-bottom: 0.5rem; color: #fcd34d;">Start New Session</h3>
+                    <p style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 1rem;">This will reset the leaderboard to zero and prepare for a new group. Previous data is kept safely for Excel exports.</p>
+                    <button id="restart-session-btn" style="background-color: #f59e0b; color: white;">Restart Session</button>
+                </div>
 
                 <div
                     style="background: rgba(0,0,0,0.1); padding: 1rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
@@ -134,9 +140,12 @@
 
         <!-- Third Panel: Leaderboard (Always Visible) -->
         <div class="glass-card">
-            <h2 style="margin-bottom: 0.5rem; text-align: left;">
-                Session Leaderboard
-            </h2>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem;">
+                <h2 style="margin-bottom: 0; text-align: left;">
+                    Session Leaderboard
+                </h2>
+                <div style="font-size: 0.9rem; color: #94a3b8; font-weight: 500;">Questions: <span id="admin-total-questions">0</span></div>
+            </div>
             <div id="leaderboard-list">
                 <div class="empty-state">No scores recorded yet.</div>
             </div>

@@ -16,6 +16,7 @@ const activeQuestionPanel = document.getElementById('active-question-panel');
 const currentActiveQuestion = document.getElementById('current-active-question');
 const adminCountdown = document.getElementById('admin-countdown');
 const clearBtn = document.getElementById('clear-btn');
+const restartSessionBtn = document.getElementById('restart-session-btn');
 const exportBtn = document.getElementById('export-btn');
 const exportStartInput = document.getElementById('export-start');
 const exportEndInput = document.getElementById('export-end');
@@ -25,6 +26,7 @@ const openRosterBtn = document.getElementById('open-roster-btn');
 const closeRosterBtn = document.getElementById('close-roster-btn');
 const rosterModal = document.getElementById('roster-modal');
 const rosterList = document.getElementById('roster-list');
+const adminTotalQuestions = document.getElementById('admin-total-questions');
 const leaderboardList = document.getElementById('leaderboard-list');
 
 const imagePreviewContainer = document.getElementById('image-preview-container');
@@ -333,8 +335,14 @@ askBtn.addEventListener('click', () => {
 });
 
 clearBtn.addEventListener('click', () => {
-    if (confirm('Are you sure you want to clear the current active session?')) {
+    if (confirm('Are you sure you want to clear the current active question?')) {
         socket.emit('admin_clear', passwordInput.value);
+    }
+});
+
+restartSessionBtn.addEventListener('click', () => {
+    if (confirm('Are you sure you want to start a new quiz session? This will reset the leaderboard to zero. Previous answers are safely archived for exports.')) {
+        socket.emit('admin_restart_session', passwordInput.value);
     }
 });
 
@@ -449,10 +457,13 @@ socket.on('response_marked', ({ responseId, isCorrect }) => {
 });
 
 socket.on('leaderboard_update', (data) => {
-    renderLeaderboard(data);
+    const leaderboard = data.leaderboard || [];
+    const totalQ = data.totalQuestions || 0;
+    if(adminTotalQuestions) adminTotalQuestions.textContent = totalQ;
+    renderLeaderboard(leaderboard, totalQ);
 });
 
-function renderLeaderboard(data) {
+function renderLeaderboard(data, totalQ = 0) {
     if (!data || data.length === 0) {
         leaderboardList.innerHTML = '<div class="empty-state">No scores recorded yet. Correct answers to see the rankings!</div>';
         return;
@@ -468,7 +479,7 @@ function renderLeaderboard(data) {
             <tr class="leaderboard-row">
                 <td class="leaderboard-rank">#${idx + 1}</td>
                 <td class="leaderboard-name">${escapeHTML(item.name)}</td>
-                <td class="leaderboard-score">${item.score} Points</td>
+                <td class="leaderboard-score">${item.score} / ${totalQ}</td>
             </tr>
         `;
     });
@@ -489,3 +500,15 @@ socket.on('session_cleared', () => {
     updateResponsesList();
     renderAdminHistory();
 });
+
+socket.on('connect', () => {
+    // Re-join automatically if the connection dropped and we are already logged in
+    if (mainUi.style.display === 'grid') {
+        socket.emit('admin_join', passwordInput.value);
+    }
+});
+
+// Ping interval to keep server alive
+setInterval(() => {
+    fetch('/api/ping').catch(() => {});
+}, 5 * 60 * 1000);

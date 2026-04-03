@@ -12,13 +12,23 @@
 <body>
     <div class="container glass-card">
 
+        <!-- Global Header (appears after joining) -->
+        <div id="student-header" style="display: none; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--glass-border);">
+            <div style="font-size: 1rem; color: #e2e8f0; font-weight: 500;">Player: <span id="display-name" style="color: #818cf8;"></span></div>
+            <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.5rem 1rem; border-radius: 2rem; color: #10b981; font-weight: 600; font-size: 0.9rem;">
+                Score: <span id="student-score">0</span>
+            </div>
+        </div>
+
         <!-- View 1: Name Entry -->
-        <div id="name-section" class="active">
+        <div id="name-section">
             <h1>Join the Poll</h1>
-            <p style="text-align: center; color: #94a3b8; margin-bottom: 2rem;">Enter your name to participate
-                anonymously.</p>
+            <p style="text-align: center; color: #94a3b8; margin-bottom: 2rem;">Enter your name and phone number to join</p>
             <div class="form-group">
                 <input type="text" id="username" placeholder="Your Name" autocomplete="off" autofocus>
+            </div>
+            <div class="form-group">
+                <input type="tel" id="userphone" placeholder="Your Phone Number (e.g. 9876543210)" autocomplete="off">
             </div>
             <button id="join-btn">Join Now</button>
         </div>

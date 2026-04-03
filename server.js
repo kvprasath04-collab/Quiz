@@ -16,9 +16,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Persistent Data Storage (Supports Render Disks via DATA_DIR environment variable)
 const dataDir = process.env.DATA_DIR || __dirname;
 const DATA_FILE = path.join(dataDir, 'data.json');
+const STATE_FILE = path.join(dataDir, 'state.json');
 
 const MONGODB_URI = process.env.MONGODB_URI || null;
 const SessionHistory = mongoose.model('SessionHistory', new mongoose.Schema({}, { strict: false }));
+const SystemState = mongoose.model('SystemState', new mongoose.Schema({}, { strict: false }));
 
 // Application State
 let activeQuestion = null;
@@ -28,15 +30,28 @@ let responses = []; // Array of { name: string, answer: string, id: string }
 let history = []; // Array to store all past questions and responses
 let sessionStartTime = Date.now(); // Timestamp to start calculating scores from
 
-// Load history from disk or Mongo on startup
-async function initHistory() {
+// Load history and state from disk or Mongo on startup
+async function initState() {
     if (MONGODB_URI) {
         try {
             await mongoose.connect(MONGODB_URI);
             console.log("Connected to MongoDB Cloud Database!");
+            
+            // Load History
             const dbHistory = await SessionHistory.find({}).sort({ timestamp: 1 });
             history = dbHistory.map(doc => doc.toObject());
             console.log(`Loaded ${history.length} historical sessions from MongoDB`);
+
+            // Load State
+            const stateDoc = await SystemState.findOne({});
+            if (stateDoc) {
+                const s = stateDoc.toObject();
+                activeQuestion = s.activeQuestion || null;
+                activeImage = s.activeImage || null;
+                timerEnd = s.timerEnd || null;
+                responses = s.responses || [];
+                sessionStartTime = s.sessionStartTime || Date.now();
+            }
         } catch (error) {
             console.error("Error connecting to MongoDB:", error);
             history = [];
@@ -50,31 +65,65 @@ async function initHistory() {
             } else {
                 fs.writeFileSync(DATA_FILE, JSON.stringify([]));
             }
+            
+            if (fs.existsSync(STATE_FILE)) {
+                const stateData = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+                activeQuestion = stateData.activeQuestion || null;
+                activeImage = stateData.activeImage || null;
+                timerEnd = stateData.timerEnd || null;
+                responses = stateData.responses || [];
+                sessionStartTime = stateData.sessionStartTime || Date.now();
+            }
         } catch (error) {
-            console.error("Error loading data.json:", error);
+            console.error("Error loading local files:", error);
             history = [];
         }
     }
-}
-initHistory();
 
-// Helper function to save history
-async function saveHistory() {
+    // Auto-reset logic if the day has changed
+    const savedDate = new Date(sessionStartTime).toDateString();
+    const todayDate = new Date().toDateString();
+    if (savedDate !== todayDate) {
+        console.log("New day detected cross-session. Automatically restarting session.");
+        sessionStartTime = Date.now();
+        activeQuestion = null;
+        activeImage = null;
+        timerEnd = null;
+        responses = [];
+        saveState();
+    }
+}
+initState();
+
+// Helper function to save history and current state
+async function saveState() {
+    const currentStateObj = {
+        activeQuestion,
+        activeImage,
+        timerEnd,
+        responses,
+        sessionStartTime
+    };
+
     if (MONGODB_URI) {
         try {
-            // Synchronize the memory array precisely to the cloud collection
+            // History
             await SessionHistory.deleteMany({});
             if (history.length > 0) {
                 await SessionHistory.insertMany(history);
             }
+            // State
+            await SystemState.deleteMany({});
+            await SystemState.create(currentStateObj);
         } catch (error) {
             console.error("Error saving to MongoDB:", error);
         }
     } else {
         try {
             fs.writeFileSync(DATA_FILE, JSON.stringify(history, null, 2));
+            fs.writeFileSync(STATE_FILE, JSON.stringify(currentStateObj, null, 2));
         } catch (error) {
-            console.error("Error saving to data.json:", error);
+            console.error("Error saving strictly local files:", error);
         }
     }
 }
@@ -88,8 +137,12 @@ io.on('connection', (socket) => {
     // Broadcast total count, though we will also send names now
     io.emit('client_count', io.engine.clientsCount);
 
-    socket.on('user_join_roster', (name) => {
-        connectedUsers.set(socket.id, name);
+    socket.on('user_join_roster', (data) => {
+        let displayName = data;
+        if (data && typeof data === 'object') {
+            displayName = data.phone ? `${data.name} (${data.phone})` : data.name;
+        }
+        connectedUsers.set(socket.id, displayName);
         // Only admins need the roster
         io.emit('roster_update', Array.from(connectedUsers.values()));
     });
@@ -102,6 +155,8 @@ io.on('connection', (socket) => {
         serverTime: Date.now(),
         history // Send full history on join
     });
+    // Send the current leaderboard so returning students can see their score
+    socket.emit('leaderboard_update', calculateLeaderboard());
 
     // Send admin current responses if they just joined
     socket.on('admin_join', (password) => {
@@ -112,7 +167,8 @@ io.on('connection', (socket) => {
             activeImage,
             timerEnd,
             serverTime: Date.now(),
-            responses
+            responses,
+            history
         });
         socket.emit('roster_update', Array.from(connectedUsers.values()));
     });
@@ -129,7 +185,6 @@ io.on('connection', (socket) => {
                 responses: [...responses],
                 timestamp: new Date().toISOString()
             });
-            saveHistory(); // Persist to disk
         }
 
         const durationMs = (duration || 60) * 1000;
@@ -139,6 +194,7 @@ io.on('connection', (socket) => {
         activeImage = image;
         timerEnd = Date.now() + durationMs;
         responses = []; // Reset responses for the new question
+        saveState(); // Persist active question to disk
 
         // Broadcast the new question to all connected clients
         io.emit('new_question', {
@@ -151,7 +207,7 @@ io.on('connection', (socket) => {
     });
 
     // User submits an answer
-    socket.on('user_submit_answer', ({ name, answer }) => {
+    socket.on('user_submit_answer', ({ name, phone, answer }) => {
         // Validate if question is active and time hasn't expired
         if (!activeQuestion) {
             socket.emit('submission_error', { message: 'No active question.' });
@@ -166,26 +222,28 @@ io.on('connection', (socket) => {
         }
 
         // Prevent duplicate answers by the same user to avoid duplicate score accumulation
-        if (responses.some(r => r.name === name)) {
+        if (responses.some(r => (phone && r.phone === phone) || (!phone && r.name === name))) {
             socket.emit('submission_error', { message: 'You have already submitted an answer for this question.' });
             return;
         }
 
         // Guarantee the user is in the roster (fallback for stale clients)
         if (!connectedUsers.has(socket.id)) {
-            connectedUsers.set(socket.id, name);
+            connectedUsers.set(socket.id, phone ? `${name} (${phone})` : name);
             io.emit('roster_update', Array.from(connectedUsers.values()));
         }
 
         // Add response
         const newResponse = {
             name,
+            phone,
             answer,
             id: socket.id,
             responseId: `resp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             isCorrect: null // null = unmarked, true = correct, false = incorrect
         };
         responses.push(newResponse);
+        saveState();
 
         console.log(`Answer received from ${name}: ${answer}`);
 
@@ -206,6 +264,7 @@ io.on('connection', (socket) => {
         if (resp) {
             resp.isCorrect = isCorrect;
             found = true;
+            saveState();
         } else {
             // Check history
             for (let session of history) {
@@ -213,7 +272,7 @@ io.on('connection', (socket) => {
                 if (hResp) {
                     hResp.isCorrect = isCorrect;
                     found = true;
-                    saveHistory();
+                    saveState();
                     break;
                 }
             }
@@ -228,11 +287,16 @@ io.on('connection', (socket) => {
 
     function calculateLeaderboard() {
         const scores = new Map();
+        let totalQuestions = 0;
 
         const processResponses = (resps) => {
             resps.forEach(r => {
                 if (r.isCorrect === true) {
-                    scores.set(r.name, (scores.get(r.name) || 0) + 1);
+                    const phoneKey = r.phone || r.name; // Fallback to name if phone is missing
+                    const existing = scores.get(phoneKey) || { name: r.name, phone: phoneKey, score: 0 };
+                    existing.score += 1;
+                    if (r.name) existing.name = r.name; // Use latest name
+                    scores.set(phoneKey, existing);
                 }
             });
         };
@@ -240,17 +304,26 @@ io.on('connection', (socket) => {
         // Process only history items that occurred after sessionStartTime
         history.forEach(session => {
             if (new Date(session.timestamp).getTime() >= sessionStartTime) {
+                totalQuestions++;
                 processResponses(session.responses);
             }
         });
         
         // Process current active responses
-        processResponses(responses);
+        if (activeQuestion) {
+            totalQuestions++;
+            processResponses(responses);
+        }
 
         // Convert to array and sort
-        return Array.from(scores.entries())
-            .map(([name, score]) => ({ name, score }))
+        const leaderboardData = Array.from(scores.values())
+            .map(entry => ({ name: entry.name, phone: entry.phone, score: entry.score }))
             .sort((a, b) => b.score - a.score);
+
+        return {
+            leaderboard: leaderboardData,
+            totalQuestions: totalQuestions
+        };
     }
 
     // Admin requests leaderboard
@@ -271,7 +344,30 @@ io.on('connection', (socket) => {
                 responses: [...responses],
                 timestamp: new Date().toISOString()
             });
-            saveHistory(); // Persist to disk
+        }
+
+        activeQuestion = null;
+        activeImage = null;
+        timerEnd = null;
+        responses = [];
+        saveState(); // Save state including archived question and cleared active variables
+        
+        io.emit('session_cleared');
+        io.emit('leaderboard_update', calculateLeaderboard()); // Broadcast that the leaderboard is still there but question cleared
+    });
+
+    // Admin restarts the entire session for the day
+    socket.on('admin_restart_session', (password) => {
+        if (password !== ADMIN_PASSWORD) return;
+
+        // Archive the question first if it exists
+        if (activeQuestion) {
+            history.push({
+                question: activeQuestion,
+                image: activeImage,
+                responses: [...responses],
+                timestamp: new Date().toISOString()
+            });
         }
 
         activeQuestion = null;
@@ -281,6 +377,7 @@ io.on('connection', (socket) => {
         
         // Reset scores start time
         sessionStartTime = Date.now();
+        saveState();
         
         io.emit('session_cleared');
         io.emit('leaderboard_update', calculateLeaderboard()); // Broadcast that the leaderboard is now empty
@@ -291,13 +388,14 @@ io.on('connection', (socket) => {
         if (password !== ADMIN_PASSWORD) return;
 
         history = [];
-        saveHistory(); // Clear the disk file
 
         // Also clear the active question/responses since they asked to wipe everything
         activeQuestion = null;
         activeImage = null;
         timerEnd = null;
         responses = [];
+        sessionStartTime = Date.now();
+        saveState(); // Clear the disk file and state
 
         io.emit('session_cleared');
         // Sending an empty history forces admin UI to clear the table
@@ -318,6 +416,11 @@ io.on('connection', (socket) => {
         io.emit('client_count', io.engine.clientsCount);
         io.emit('roster_update', Array.from(connectedUsers.values()));
     });
+});
+
+// Ping endpoint to keep server alive (prevent PaaS idle sleep)
+app.get('/api/ping', (req, res) => {
+    res.status(200).send('pong');
 });
 
 // API endpoint for Excel Export
@@ -371,6 +474,7 @@ app.get('/api/export', (req, res) => {
                     Timestamp: session.timestamp,
                     Question: session.question,
                     Student_Name: 'N/A (No responses)',
+                    Phone_Number: 'N/A',
                     Answer: 'N/A'
                 });
             } else {
@@ -380,6 +484,7 @@ app.get('/api/export', (req, res) => {
                         Timestamp: session.timestamp,
                         Question: session.question,
                         Student_Name: resp.name,
+                        Phone_Number: resp.phone || 'N/A',
                         Answer: resp.answer
                     });
                 });
