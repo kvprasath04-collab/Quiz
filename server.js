@@ -5,10 +5,22 @@ const path = require('path');
 const xlsx = require('xlsx');
 const fs = require('fs');
 const mongoose = require('mongoose');
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+// Increase limits for processing large PDF files (32MB+ )
+const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+});
+
+// Configure Express to handle large headers/payloads
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Serve static files from the public directory
 app.use(express.static(path.join(__dirname, 'public')));
@@ -29,6 +41,7 @@ let timerEnd = null; // Timestamp when the question expires
 let responses = []; // Array of { name: string, answer: string, id: string }
 let history = []; // Array to store all past questions and responses
 let sessionStartTime = Date.now(); // Timestamp to start calculating scores from
+let triviaHints = []; // Array of hints extracted from PDF
 
 // Load history and state from disk or Mongo on startup
 async function initState() {
@@ -51,6 +64,7 @@ async function initState() {
                 timerEnd = s.timerEnd || null;
                 responses = s.responses || [];
                 sessionStartTime = s.sessionStartTime || Date.now();
+                triviaHints = s.triviaHints || [];
             }
         } catch (error) {
             console.error("Error connecting to MongoDB:", error);
@@ -73,6 +87,7 @@ async function initState() {
                 timerEnd = stateData.timerEnd || null;
                 responses = stateData.responses || [];
                 sessionStartTime = stateData.sessionStartTime || Date.now();
+                triviaHints = stateData.triviaHints || [];
             }
         } catch (error) {
             console.error("Error loading local files:", error);
@@ -102,7 +117,8 @@ async function saveState() {
         activeImage,
         timerEnd,
         responses,
-        sessionStartTime
+        sessionStartTime,
+        triviaHints
     };
 
     if (MONGODB_URI) {
@@ -138,8 +154,9 @@ const ADMIN_PASSWORD = 'Prasath_04';
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    // Broadcast total count, though we will also send names now
-    io.emit('client_count', io.engine.clientsCount);
+    // Broadcast that a new socket connected.
+    // The metric 'client_count' now Tracks only registered students
+    io.emit('client_count', connectedUsers.size);
 
     socket.on('user_join_roster', (data) => {
         let displayName = data;
@@ -149,7 +166,13 @@ io.on('connection', (socket) => {
         connectedUsers.set(socket.id, displayName);
         // Only admins need the roster
         io.emit('roster_update', Array.from(connectedUsers.values()));
+        io.emit('client_count', connectedUsers.size);
     });
+
+    // Helper to get only today's session history for the client UI
+    function getSessionHistory() {
+        return history.filter(session => new Date(session.timestamp).getTime() >= sessionStartTime);
+    }
 
     // When a user connects, send them the current state
     socket.emit('current_state', {
@@ -157,7 +180,8 @@ io.on('connection', (socket) => {
         activeImage,
         timerEnd,
         serverTime: Date.now(),
-        history // Send full history on join
+        triviaHints,
+        history: getSessionHistory() // Send only current session history on join
     });
     // Send the current leaderboard so returning students can see their score
     socket.emit('leaderboard_update', calculateLeaderboard());
@@ -172,7 +196,8 @@ io.on('connection', (socket) => {
             timerEnd,
             serverTime: Date.now(),
             responses,
-            history
+            triviaHints,
+            history: getSessionHistory()
         });
         socket.emit('roster_update', Array.from(connectedUsers.values()));
     });
@@ -206,7 +231,7 @@ io.on('connection', (socket) => {
             image: activeImage,
             timerEnd,
             serverTime: Date.now(),
-            history // Send updated history
+            history: getSessionHistory() // Send only current session history
         });
     });
 
@@ -235,6 +260,7 @@ io.on('connection', (socket) => {
         if (!connectedUsers.has(socket.id)) {
             connectedUsers.set(socket.id, phone ? `${name} (${phone})` : name);
             io.emit('roster_update', Array.from(connectedUsers.values()));
+            io.emit('client_count', connectedUsers.size);
         }
 
         // Add response
@@ -417,9 +443,94 @@ io.on('connection', (socket) => {
         console.log(`User disconnected: ${socket.id}`);
         connectedUsers.delete(socket.id);
 
-        io.emit('client_count', io.engine.clientsCount);
+        io.emit('client_count', connectedUsers.size);
         io.emit('roster_update', Array.from(connectedUsers.values()));
     });
+    
+    // Broadcast hype emojis to admin and specific room/clients
+    socket.on('student_hype', (emoji) => {
+        io.emit('show_hype', emoji);
+    });
+});
+
+// PDF Parsing Route for extracting trivia
+app.post('/api/upload-pdf', upload.single('pdf'), async (req, res) => {
+    if (!req.file || req.body.password !== ADMIN_PASSWORD) {
+        return res.status(401).json({ error: 'Unauthorized or missing file' });
+    }
+    try {
+        const fromPage = parseInt(req.body.fromPage) || 1;
+        const toPage = parseInt(req.body.toPage) || 9999;
+
+        console.log(`Extraction Request: From Page ${fromPage} to ${toPage}`);
+        
+        let options = {
+            pagerender: function(pageData) {
+                const currentPage = pageData.pageIndex + 1;
+                
+                if (currentPage >= fromPage && currentPage <= toPage) {
+                    console.log(`[Trivia Engine] Extracting Text from Page ${currentPage}...`);
+                    return pageData.getTextContent().then(function(textContent) {
+                        let lastY, lastX, text = '';
+                        for (let item of textContent.items) {
+                            if (lastY == item.transform[5] || !lastY){
+                                if (lastX && (item.transform[4] - lastX) > 2) {
+                                    text += ' ' + item.str;
+                                } else {
+                                    text += item.str;
+                                }
+                            } else {
+                                text += '\n' + item.str;
+                            }    
+                            lastY = item.transform[5];
+                            lastX = item.transform[4] + (item.width || 0);
+                        }
+                        return text;
+                    });
+                }
+                // Important: Return a resolved empty string for pages outside the range
+                return Promise.resolve("");
+            }
+        };
+
+        const data = await pdfParse(req.file.buffer, options);
+        // Replace all whitespace sequences (including newlines) with a single space
+        // This is critical to fix the "word clumping" issue where spaces are lost
+        const text = data.text.replace(/\s+/g, ' ').trim();
+        
+        if (!text || text.trim().length === 0) {
+            throw new Error('PDF appears to be empty or contains no extractable text.');
+        }
+
+        // Split by sentences using naive regex
+        const sentences = text.split(/(?<=[.!?])\s+/);
+        let extracted = [];
+        
+        for(let s of sentences) {
+            let clean = s.replace(/[\n\r]/g, ' ').trim();
+            // Filter out numbers/titles/gibberish by picking solid middle-length string
+            if (clean.length > 30 && clean.length < 150) {
+                extracted.push(clean);
+            }
+        }
+        
+        if (extracted.length === 0) {
+            throw new Error('Could not find any suitable trivia sentences in this PDF.');
+        }
+
+        // Shuffle and limit to 100 maximum
+        extracted = extracted.sort(() => 0.5 - Math.random()).slice(0, 100);
+        
+        triviaHints = extracted;
+        saveState();
+        
+        io.emit('trivia_update', triviaHints);
+        console.log(`Successfully extracted ${triviaHints.length} facts from PDF.`);
+        res.json({ message: `Successfully extracted ${triviaHints.length} facts.`, count: triviaHints.length });
+    } catch(err) {
+        console.error("PDF Processing Error:", err.message);
+        res.status(500).json({ error: `Failed to process PDF: ${err.message}` });
+    }
 });
 
 // Ping endpoint to keep server alive (prevent PaaS idle sleep)

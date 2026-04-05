@@ -11,10 +11,14 @@ let hasAnsweredCurrentQuestion = false;
 // DOM Elements
 const sections = {
     name: document.getElementById('name-section'),
-    waiting: document.getElementById('waiting-section'),
     question: document.getElementById('question-section'),
-    submitted: document.getElementById('submitted-section')
+    dashboard: document.getElementById('dashboard-layout')
 };
+
+const waitingStatus = document.getElementById('waiting-status-content');
+const submittedStatus = document.getElementById('submitted-status-content');
+const waitingContent = document.getElementById('waiting-content');
+const submittedContent = document.getElementById('submitted-content');
 
 const joinBtn = document.getElementById('join-btn');
 const usernameInput = document.getElementById('username');
@@ -22,8 +26,15 @@ const userphoneInput = document.getElementById('userphone');
 const submitBtn = document.getElementById('submit-btn');
 const answerInput = document.getElementById('answer-input');
 const liveQuestionEl = document.getElementById('live-question');
-const countdownEl = document.getElementById('countdown');
 const liveQuestionImageEl = document.getElementById('live-question-image');
+
+const progressBarFill = document.getElementById('progress-bar-fill');
+const progressBarText = document.getElementById('progress-bar-text');
+
+const toastReaction = document.getElementById('toast-reaction');
+const toastEmoji = document.getElementById('toast-emoji');
+const toastMessage = document.getElementById('toast-message');
+
 const waitingTitle = document.getElementById('waiting-title');
 const waitingMessage = document.getElementById('waiting-message');
 const submittedQuestionEl = document.getElementById('submitted-question');
@@ -36,11 +47,99 @@ const studentHeader = document.getElementById('student-header');
 const displayName = document.getElementById('display-name');
 const studentScore = document.getElementById('student-score');
 
+const podiumContainer = document.getElementById('podium-container');
+const triviaPanel = document.getElementById('trivia-panel');
+const triviaContent = document.getElementById('trivia-content');
+const hypeBar = document.getElementById('hype-bar');
+
+let triviaHints = [];
+let currentTriviaIndex = 0;
+let triviaInterval = null;
+let lastTriviaContent = "";
+
+function startTriviaRotation() {
+    if (triviaHints.length === 0) {
+        if (triviaInterval) clearInterval(triviaInterval);
+        triviaPanel.style.display = 'none';
+        return;
+    }
+
+    // Don't restart if already running for the exact same trivia set
+    const currentSerialized = JSON.stringify(triviaHints);
+    if (triviaInterval && lastTriviaContent === currentSerialized) {
+        return;
+    }
+
+    // New content or first run: Reset to beginning
+    lastTriviaContent = currentSerialized;
+    currentTriviaIndex = 0; 
+    
+    if (triviaInterval) clearInterval(triviaInterval);
+
+    triviaPanel.style.display = 'block';
+    updateTriviaDisplay(); // Show index 0 immediately
+
+    triviaInterval = setInterval(() => {
+        currentTriviaIndex = (currentTriviaIndex + 1) % triviaHints.length;
+        updateTriviaDisplay();
+    }, 60000); // 1 minute per fact
+}
+
+function updateTriviaDisplay() {
+    if (triviaHints[currentTriviaIndex]) {
+        triviaContent.style.opacity = 0;
+        setTimeout(() => {
+            triviaContent.innerText = triviaHints[currentTriviaIndex];
+            triviaContent.style.opacity = 1;
+        }, 500);
+    }
+}
+
 // Utility Functions
+function getAvatarEmoji(str) {
+    const emojis = ['🐶', '🐱', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🦄', '🐝', '🐛', '🦋', '🐢', '🐙', '🦑', '🦞', '🦖', '🦕'];
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % emojis.length;
+    return emojis[index];
+}
+
 function switchView(viewName) {
-    Object.values(sections).forEach(section => section.classList.remove('active'));
-    sections[viewName].classList.add('active');
+    // Standard section visibility
+    document.querySelectorAll('#standalone-content > div').forEach(div => div.style.display = 'none');
+    sections.dashboard.style.display = 'none';
+
+    if (viewName === 'name' || viewName === 'question') {
+        sections[viewName].style.display = 'block';
+    } else {
+        sections.dashboard.style.display = (window.innerWidth >= 1024) ? 'grid' : 'flex';
+        
+        // Internal Dashboard Toggling
+        waitingStatus.style.display = (viewName === 'waiting') ? 'block' : 'none';
+        submittedStatus.style.display = (viewName === 'submitted') ? 'block' : 'none';
+        waitingContent.style.display = (viewName === 'waiting') ? 'block' : 'none';
+        submittedContent.style.display = (viewName === 'submitted') ? 'block' : 'none';
+    }
+    
     currentView = viewName;
+
+    // Toggle hype bar - hide only in name entry
+    if (viewName === 'name') {
+        hypeBar.style.display = 'none';
+    } else {
+        hypeBar.style.display = 'flex';
+    }
+
+    // Toggle trivia panel
+    if ((viewName === 'waiting' || viewName === 'submitted') && triviaHints.length > 0) {
+        triviaPanel.style.display = 'block';
+        startTriviaRotation();
+    } else {
+        triviaPanel.style.display = 'none';
+        clearInterval(triviaInterval);
+    }
 
     // Show history panel only after joining
     if (userName && viewName !== 'name-section') {
@@ -58,18 +157,33 @@ function startTimer(targetTimeServer, serverTimeOrigin) {
 
     // Local end time
     endTime = targetTimeServer + timeOffset;
+    const initialRemaining = Math.max(0, endTime - Date.now());
+    
+    // If it's a new question, duration is around 60s. If refreshed, we use remaining.
+    // For smooth visuals we use initialRemaining as the 100% width if refreshed.
+    const totalDurationMs = initialRemaining > 0 ? initialRemaining : 60000;
 
     const updateTimer = () => {
         const now = Date.now();
         const remaining = Math.max(0, endTime - now);
-        const seconds = Math.floor(remaining / 1000);
+        const seconds = Math.ceil(remaining / 1000);
+        
+        let percent = (remaining / totalDurationMs) * 100;
+        if (percent < 0) percent = 0;
+        if (percent > 100) percent = 100;
 
-        countdownEl.textContent = seconds;
+        progressBarFill.style.width = `${percent}%`;
+        progressBarText.textContent = `${seconds}s`;
 
-        if (seconds <= 10) {
-            countdownEl.classList.add('warning');
+        if (seconds <= 5) {
+            progressBarFill.style.backgroundColor = 'var(--error)';
+            progressBarFill.style.boxShadow = '0 0 10px var(--error)';
+        } else if (seconds <= 15) {
+            progressBarFill.style.backgroundColor = '#f59e0b'; // warning yellow
+            progressBarFill.style.boxShadow = '0 0 10px #f59e0b';
         } else {
-            countdownEl.classList.remove('warning');
+            progressBarFill.style.backgroundColor = 'var(--success)';
+            progressBarFill.style.boxShadow = '0 0 10px var(--success)';
         }
 
         if (remaining <= 0) {
@@ -141,7 +255,7 @@ if (savedName && savedPhone) {
     // because userName is now populated.
 } else {
     // Show the name section by default if no saved name
-    sections['name'].classList.add('active');
+    switchView('name');
 }
 
 // Event Listeners (UI)
@@ -227,6 +341,10 @@ socket.on('current_state', (state) => {
         renderHistory(state.history, userName);
     }
 
+    if (state.triviaHints) {
+        triviaHints = state.triviaHints;
+    }
+
     if (state.activeQuestion) {
         const timeOffset = Date.now() - state.serverTime;
         const localEndTime = state.timerEnd + timeOffset;
@@ -284,20 +402,107 @@ socket.on('leaderboard_update', (data) => {
     } else {
         studentScore.textContent = `0 / ${totalQuestions}`;
     }
+
+    renderPodium(leaderboard);
 });
+
+socket.on('trivia_update', (hints) => {
+    triviaHints = hints;
+    if ((currentView === 'waiting' || currentView === 'submitted') && triviaHints.length > 0) {
+        triviaPanel.style.display = 'block';
+        startTriviaRotation();
+    }
+});
+
+socket.on('show_hype', (emoji) => {
+    showHype(emoji);
+});
+
+window.sendHype = function(emoji) {
+    socket.emit('student_hype', emoji);
+};
+
+function showHype(emoji) {
+    const el = document.createElement('div');
+    el.className = 'floating-emoji';
+    el.textContent = emoji;
+    
+    // Random position
+    const left = Math.random() * 80 + 10;
+    el.style.left = `${left}%`;
+    
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2500);
+}
+
+function renderPodium(leaderboard) {
+    if (!podiumContainer) return;
+    
+    const top3 = leaderboard.slice(0, 3);
+    if (top3.length === 0) {
+        podiumContainer.innerHTML = '';
+        return;
+    }
+
+    let html = '';
+    // Sort for visual display 2nd, 1st, 3rd
+    const displayOrder = [];
+    if (top3[1]) displayOrder.push({ ...top3[1], rank: 2 });
+    if (top3[0]) displayOrder.push({ ...top3[0], rank: 1 });
+    if (top3[2]) displayOrder.push({ ...top3[2], rank: 3 });
+
+    displayOrder.forEach(player => {
+        html += `
+            <div class="podium-item rank-${player.rank}">
+                <div class="podium-rank">#${player.rank}</div>
+                <div class="podium-avatar">${getAvatarEmoji(player.phone || player.name)}</div>
+                <div class="podium-bar">${player.score}</div>
+                <div class="podium-name">${player.name}</div>
+            </div>
+        `;
+    });
+
+    podiumContainer.innerHTML = html;
+}
+
+function startTriviaRotation() {
+    clearInterval(triviaInterval);
+    if (triviaHints.length === 0) return;
+
+    const showNext = () => {
+        const hint = triviaHints[Math.floor(Math.random() * triviaHints.length)];
+        triviaContent.style.opacity = 0;
+        setTimeout(() => {
+            triviaContent.textContent = hint;
+            triviaContent.style.opacity = 1;
+        }, 500);
+    };
+
+    showNext();
+    triviaInterval = setInterval(showNext, 8000);
+}
 
 socket.on('response_marked', ({ responseId, isCorrect, phone }) => {
     if (userName && userPhone && phone === userPhone) {
-        // Did we just get marked as Correct?
+        // Reaction logic
         if (isCorrect === true) {
+            // Confetti for correct
             if (typeof confetti === 'function') {
                 confetti({
                     particleCount: 150,
                     spread: 80,
                     origin: { y: 0.6 },
-                    colors: ['#10b981', '#fcd34d', '#indigo']
+                    colors: ['#10b981', '#fcd34d', '#818cf8']
                 });
             }
+        } else if (isCorrect === false) {
+            // Sad face toast for incorrect
+            toastEmoji.textContent = '😞';
+            toastMessage.textContent = 'Ah, incorrect this time!';
+            toastReaction.classList.add('show');
+            setTimeout(() => {
+                toastReaction.classList.remove('show');
+            }, 3000);
         }
     }
 });
@@ -331,46 +536,48 @@ function renderHistory(historyData, currentUserName) {
         return;
     }
 
-    // Build table structure
-    let tableHtml = `
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th style="width: 10%;">#</th>
-                    <th style="width: 50%;">Question</th>
-                    <th style="width: 40%;">Your Answer</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-
     // Reverse to show newest history items first
     const reversedHistory = [...historyData].reverse();
 
-    reversedHistory.forEach((session, idx) => {
-        // Find if the current user answered this question
-        const userResponse = session.responses.find(r => r.name === currentUserName);
-        const answerText = userResponse ? userResponse.answer : "Did not answer";
-        const answerColor = userResponse ? "#f8fafc" : "#64748b";
-        const questionNumber = historyData.length - idx;
-        const questionHtml = escapeHTML(session.question);
-        const imageHtml = session.image ? `<br><img src="${session.image}" style="max-height: 100px; max-width: 100%; border-radius: 0.5rem; margin-top: 0.5rem; border: 1px solid rgba(255,255,255,0.1);">` : '';
+    let html = '<div style="display: flex; flex-direction: column; gap: 1rem;">';
 
-        tableHtml += `
-            <tr>
-                <td style="color: #818cf8; font-weight: 500;">Q${questionNumber}</td>
-                <td>${questionHtml}${imageHtml}</td>
-                <td style="color: ${answerColor}; white-space: pre-wrap;">${escapeHTML(answerText)}</td>
-            </tr>
+    reversedHistory.forEach((session, idx) => {
+        const entry = session.responses.find(r => r.name === currentUserName);
+        const qNumDate = historyData.length - idx;
+        
+        let statusText = "No answer";
+        let style = "color: #64748b;";
+        
+        if (entry) {
+            if (entry.isCorrect === true) {
+                statusText = "Correct";
+                style = "color: #10b981;";
+            } else if (entry.isCorrect === false) {
+                statusText = "Incorrect";
+                style = "color: #ef4444;";
+            } else {
+                statusText = "Pending";
+                style = "color: #f59e0b;";
+            }
+        }
+
+        html += `
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--glass-border);">
+                <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
+                    <span>Q${qNumDate}</span>
+                    <span style="${style}">${statusText}</span>
+                </div>
+                <div class="question-text" id="submitted-question"
+                    style="font-size: 1rem; color: #94a3b8; margin-bottom: 1rem; background-clip: initial; -webkit-background-clip: initial;">
+                    ${escapeHTML(session.question)}
+                </div>
+                <div style="font-size: 0.9rem; color: #818cf8; font-weight: 500;"><span class="leaderboard-avatar">${getAvatarEmoji(userPhone || userName)}</span> Your Ans: ${entry ? escapeHTML(entry.answer) : 'N/A'}</div>
+            </div>
         `;
     });
 
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
-
-    historyList.innerHTML = tableHtml;
+    html += '</div>';
+    historyList.innerHTML = html;
 }
 
 function escapeHTML(str) {

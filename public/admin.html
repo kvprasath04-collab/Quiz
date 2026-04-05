@@ -76,10 +76,30 @@
                     <button id="restart-session-btn" style="background-color: #f59e0b; color: white;">Restart Session</button>
                 </div>
 
+                <div style="background: rgba(16, 185, 129, 0.1); padding: 1rem; border-radius: 0.75rem; border: 1px solid rgba(16, 185, 129, 0.2);">
+                    <h3 style="font-size: 0.9rem; text-align: left; margin-bottom: 0.5rem; color: #34d399;">Upload Study Material (PDF)</h3>
+                    <p style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 1rem;">Extracts reading material into short trivia nuggets to display on student screens while they wait.</p>
+                    <input type="file" id="pdf-upload" accept="application/pdf" style="display: none;">
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                        <div style="flex: 1;">
+                            <label for="pdf-from-page" style="font-size: 0.7rem; color: #94a3b8;">From Page</label>
+                            <input type="number" id="pdf-from-page" min="1" placeholder="1"
+                                style="width: 100%; padding: 0.4rem; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 0.4rem; color: var(--text-color); font-size: 0.8rem;" />
+                        </div>
+                        <div style="flex: 1;">
+                            <label for="pdf-to-page" style="font-size: 0.7rem; color: #94a3b8;">To Page</label>
+                            <input type="number" id="pdf-to-page" min="1" placeholder="End"
+                                style="width: 100%; padding: 0.4rem; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--glass-border); border-radius: 0.4rem; color: var(--text-color); font-size: 0.8rem;" />
+                        </div>
+                    </div>
+                    <button id="upload-pdf-btn" style="background-color: #10b981; color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">📄 Choose PDF & Extract</button>
+                    <div id="pdf-status" style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem; display: none;"></div>
+                </div>
+
                 <div
                     style="background: rgba(0,0,0,0.1); padding: 1rem; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
                     <h3
-                        style="font-size: 0.9rem; text-align: left; margin-bottom: 0.75rem; color: #cbd5e1; -webkit-background-clip: unset; -webkit-text-fill-color: unset;">
+                        style="font-size: 0.9rem; text-align: left; margin-bottom: 0.75rem; color: #cbd5e1; -webkit-background-clip: unset; background-clip: unset; -webkit-text-fill-color: unset;">
                         Export Data</h3>
                     <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
                         <div style="flex: 1;">
@@ -170,7 +190,7 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="admin.js?v=5"></script>
+    <script src="admin.js?v=10"></script>
 </body>
 
 </html>

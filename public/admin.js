@@ -29,8 +29,24 @@ const rosterList = document.getElementById('roster-list');
 const adminTotalQuestions = document.getElementById('admin-total-questions');
 const leaderboardList = document.getElementById('leaderboard-list');
 
+const pdfUploadInput = document.getElementById('pdf-upload');
+const uploadPdfBtn = document.getElementById('upload-pdf-btn');
+const pdfStatus = document.getElementById('pdf-status');
+
 const imagePreviewContainer = document.getElementById('image-preview-container');
 const imagePreview = document.getElementById('image-preview');
+
+function getAvatarEmoji(str) {
+    if (!str) return '👤';
+    const emojis = ['🐶', '🐱', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🦄', '🐝', '🐛', '🦋', '🐢', '🐙', '🦑', '🦞', '🦖', '🦕'];
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % emojis.length;
+    return emojis[index];
+}
+
 const removeImageBtn = document.getElementById('remove-image-btn');
 const currentActiveImage = document.getElementById('current-active-image');
 const filterCorrectBtn = document.getElementById('filter-correct-btn');
@@ -157,13 +173,13 @@ function updateResponsesList() {
         const card = document.createElement('div');
         card.className = 'response-card';
         card.innerHTML = `
-            <div class="response-name">${escapeHTML(response.name)}</div>
+            <div class="response-name"><span class="leaderboard-avatar">${getAvatarEmoji(response.phone || response.name)}</span> ${escapeHTML(response.name)}</div>
             <div class="response-text">${escapeHTML(response.answer)}</div>
             <div class="mark-btn-container">
                 <button class="mark-btn correct ${response.isCorrect === true ? 'active' : ''}" 
-                    onclick="markResponse('${response.responseId}', ${response.isCorrect === true ? 'null' : 'true'})">✅ Correct</button>
+                    onclick="markResponse('${response.responseId}', ${response.isCorrect === true ? 'null' : 'true'})">✅</button>
                 <button class="mark-btn incorrect ${response.isCorrect === false ? 'active' : ''}" 
-                    onclick="markResponse('${response.responseId}', ${response.isCorrect === false ? 'null' : 'false'})">❌ Incorrect</button>
+                    onclick="markResponse('${response.responseId}', ${response.isCorrect === false ? 'null' : 'false'})">❌</button>
             </div>
         `;
         fragment.appendChild(card);
@@ -368,6 +384,55 @@ exportBtn.addEventListener('click', () => {
     window.location.href = url;
 });
 
+uploadPdfBtn.addEventListener('click', () => {
+    pdfUploadInput.click();
+});
+
+pdfUploadInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const fromPage = document.getElementById('pdf-from-page').value;
+    const toPage = document.getElementById('pdf-to-page').value;
+    
+    const formData = new FormData();
+    formData.append('pdf', file);
+    if (fromPage) formData.append('fromPage', fromPage);
+    if (toPage) formData.append('toPage', toPage);
+    formData.append('password', passwordInput.value);
+
+    uploadPdfBtn.disabled = true;
+    uploadPdfBtn.textContent = '⏳ Extracting...';
+    pdfStatus.style.display = 'block';
+    pdfStatus.textContent = 'Processing PDF text into trivia...';
+    pdfStatus.style.color = '#94a3b8';
+
+    try {
+        const response = await fetch('/api/upload-pdf', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+            pdfStatus.textContent = `✅ ${result.message}`;
+            pdfStatus.style.color = 'var(--success)';
+            uploadPdfBtn.textContent = '📄 Extraction Complete';
+            setTimeout(() => {
+                uploadPdfBtn.disabled = false;
+                uploadPdfBtn.textContent = '📄 Choose PDF & Extract';
+            }, 3000);
+        } else {
+            throw new Error(result.error || 'Upload failed');
+        }
+    } catch (err) {
+        pdfStatus.textContent = `❌ Error: ${err.message}`;
+        pdfStatus.style.color = 'var(--error)';
+        uploadPdfBtn.disabled = false;
+        uploadPdfBtn.textContent = '📄 Choose PDF & Extract';
+    }
+});
+
 openRosterBtn.addEventListener('click', () => {
     rosterModal.style.display = 'flex';
 });
@@ -478,7 +543,7 @@ function renderLeaderboard(data, totalQ = 0) {
         html += `
             <tr class="leaderboard-row">
                 <td class="leaderboard-rank">#${idx + 1}</td>
-                <td class="leaderboard-name">${escapeHTML(item.name)}</td>
+                <td class="leaderboard-name"><span class="leaderboard-avatar">${getAvatarEmoji(item.phone || item.name)}</span> ${escapeHTML(item.name)}</td>
                 <td class="leaderboard-score">${item.score} / ${totalQ}</td>
             </tr>
         `;
@@ -507,6 +572,31 @@ socket.on('connect', () => {
         socket.emit('admin_join', passwordInput.value);
     }
 });
+
+socket.on('show_hype', (emoji) => {
+    showHype(emoji);
+});
+
+function showHype(emoji) {
+    const el = document.createElement('div');
+    el.className = 'floating-emoji';
+    el.textContent = emoji;
+    
+    // Random horizontal position on administrative screen
+    const side = Math.random() > 0.5 ? 'left' : 'right';
+    const margin = Math.random() * 50 + 20;
+    el.style[side] = `${margin}px`;
+    
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2500);
+}
+
+function escapeHTML(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
 
 // Ping interval to keep server alive
 setInterval(() => {

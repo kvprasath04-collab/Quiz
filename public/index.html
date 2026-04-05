@@ -10,6 +10,14 @@
 </head>
 
 <body>
+    <div id="particles-container" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1;"></div>
+
+    <!-- Toast Reaction -->
+    <div id="toast-reaction" class="toast-reaction">
+        <div id="toast-emoji" class="toast-emoji">😞</div>
+        <div id="toast-message" class="toast-message">Better luck next time!</div>
+    </div>
+
     <div class="container glass-card">
 
         <!-- Global Header (appears after joining) -->
@@ -20,69 +28,89 @@
             </div>
         </div>
 
-        <!-- View 1: Name Entry -->
-        <div id="name-section">
-            <h1>Join the Poll</h1>
-            <p style="text-align: center; color: #94a3b8; margin-bottom: 2rem;">Enter your name and phone number to join</p>
-            <div class="form-group">
-                <input type="text" id="username" placeholder="Your Name" autocomplete="off" autofocus>
-            </div>
-            <div class="form-group">
-                <input type="tel" id="userphone" placeholder="Your Phone Number (e.g. 9876543210)" autocomplete="off">
-            </div>
-            <button id="join-btn">Join Now</button>
-        </div>
-
-        <!-- View 2: Waiting Room -->
-        <div id="waiting-section">
-            <h2 id="waiting-title">Waiting...</h2>
-            <div class="live-indicator" style="justify-content: center;">
-                <div class="live-dot"></div>
-                <span id="waiting-message">Waiting for the host to ask a question.</span>
-            </div>
-        </div>
-
-        <!-- View 3: Active Question -->
-        <div id="question-section">
-            <div class="live-indicator">
-                <div class="live-dot"></div>
-                <span>Live Question</span>
-            </div>
-            <div class="question-text" id="live-question">Loading question...</div>
-            <img id="live-question-image" src="" alt="Live Question Image" style="display: none; max-width: 100%; max-height: 200px; border-radius: 0.5rem; margin-bottom: 1rem; border: 1px solid var(--glass-border);">
-            <div class="timer" id="countdown">60</div>
-
-            <div class="form-group">
-                <textarea id="answer-input" placeholder="Type your answer here..."></textarea>
-            </div>
-            <button id="submit-btn">Submit Answer</button>
-        </div>
-
-        <!-- View 4: Submitted -->
-        <div id="submitted-section">
-            <h2 style="margin-bottom: 0.5rem;">Answer Submitted!</h2>
-            <div class="live-indicator" style="justify-content: center; margin-bottom: 2rem;">
-                <div class="live-dot" style="background-color: var(--success); animation: none;"></div>
-                <span style="color: var(--success);">Recorded</span>
-            </div>
-
-            <div class="question-text" id="submitted-question"
-                style="font-size: 1rem; color: #94a3b8; margin-bottom: 1rem;">
-                <!-- Question text goes here -->
-            </div>
-            <img id="submitted-question-image" src="" alt="Submitted Question Image" style="display: none; max-width: 100%; max-height: 200px; border-radius: 0.5rem; margin-bottom: 1.5rem; border: 1px solid var(--glass-border);">
-
-            <div
-                style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 0.75rem; padding: 1rem; margin-bottom: 2rem;">
-                <div style="font-size: 0.8rem; color: #10b981; margin-bottom: 0.5rem; font-weight: 600;">YOUR ANSWER
+        <div id="dashboard-layout" class="dashboard-layout" style="display: none;">
+            <!-- Section 1: Progress/Status -->
+            <div class="dashboard-panel status-panel">
+                <div id="waiting-status-content">
+                    <h2 id="waiting-title" style="font-size: 1.5rem; margin-bottom: 1rem;">Waiting for Question...</h2>
+                    <div class="live-indicator">
+                        <div class="live-dot"></div>
+                        <span id="waiting-message">Stay tuned for the next round.</span>
+                    </div>
                 </div>
-                <div id="submitted-answer" style="font-size: 1rem; color: #f8fafc; white-space: pre-wrap;">
-                    <!-- Answer text goes here -->
+                <div id="submitted-status-content" style="display: none;">
+                    <h2 style="font-size: 1.5rem; margin-bottom: 1rem; color: var(--success);">Answer Recorded!</h2>
+                    <div class="live-indicator">
+                        <div class="live-dot" style="background-color: var(--success); animation: none;"></div>
+                        <span>Submission received successfully.</span>
+                    </div>
                 </div>
             </div>
 
-            <p style="text-align: center; color: #64748b; font-size: 0.9rem;">Please wait for the host to ask the next
-                question.</p>
+            <!-- Section 2: Interactive Content (Podium or Answer) -->
+            <div class="dashboard-panel content-panel">
+                <div id="waiting-content" style="display: none;">
+                    <h3 style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 1.5rem; text-align: center;">Live Standings</h3>
+                    <div id="podium-container" class="podium-container">
+                        <!-- Top 3 Players -->
+                    </div>
+                </div>
+                <div id="submitted-content" style="display: none;">
+                    <h3 style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 1.5rem; text-align: center;">Your Submission</h3>
+                    <div id="submitted-question" class="question-text" style="font-size: 0.95rem; color: #cbd5e1; margin-bottom: 1rem; text-align: left;"></div>
+                    <img id="submitted-question-image" src="" alt="" style="display: none; max-width: 100%; border-radius: 0.5rem; margin-bottom: 1rem;">
+                    <div class="answer-display-card">
+                        <div style="font-size: 0.75rem; color: #10b981; font-weight: 700; margin-bottom: 0.25rem;">ANS</div>
+                        <div id="submitted-answer" style="color: white; font-weight: 500; font-size: 1.1rem; line-height: 1.5;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 3: Knowledge/Trivia -->
+            <div id="trivia-panel" class="dashboard-panel trivia-panel">
+                <div class="trivia-ticker">
+                    <div class="trivia-label">Did you know?</div>
+                    <div id="trivia-content" class="trivia-content">
+                        Learning something new every day keeps the mind sharp!
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Non-Dashboard Views (Name Entry & Active Question) -->
+        <div id="standalone-content">
+            <!-- View 1: Name Entry -->
+            <div id="name-section">
+                <h1>Join the Poll</h1>
+                <p style="text-align: center; color: #94a3b8; margin-bottom: 2rem;">Enter your name and phone number to join</p>
+                <div class="form-group">
+                    <input type="text" id="username" placeholder="Your Name" autocomplete="off" autofocus>
+                </div>
+                <div class="form-group">
+                    <input type="tel" id="userphone" placeholder="Your Phone Number" autocomplete="off">
+                </div>
+                <button id="join-btn">Join Now</button>
+            </div>
+
+            <!-- View 2: Active Question -->
+            <div id="question-section" style="display: none;">
+                <div class="live-indicator">
+                    <div class="live-dot"></div>
+                    <span>Question in Progress</span>
+                </div>
+                <div class="question-text" id="live-question">Loading...</div>
+                <img id="live-question-image" src="" alt="" style="display: none; max-width: 100%; max-height: 250px; border-radius: 0.75rem; margin-bottom: 1.5rem; border: 1px solid var(--glass-border);">
+                
+                <div class="progress-bar-container">
+                    <div id="progress-bar-fill" class="progress-bar-fill"></div>
+                    <div id="progress-bar-text" class="progress-bar-text">60s</div>
+                </div>
+
+                <div class="form-group">
+                    <textarea id="answer-input" placeholder="Type your answer here..."></textarea>
+                </div>
+                <button id="submit-btn" style="width: 100%;">Submit Answer</button>
+            </div>
         </div>
 
         <!-- History Panel (Always visible once joined, below main views) -->
@@ -98,10 +126,18 @@
 
     </div>
 
+    <!-- Hype Bar (Visible in most views) -->
+    <div id="hype-bar" class="hype-bar" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 100%; max-width: 400px; padding: 0 1rem;">
+        <button class="hype-btn" onclick="sendHype('🔥')">🔥</button>
+        <button class="hype-btn" onclick="sendHype('👏')">👏</button>
+        <button class="hype-btn" onclick="sendHype('🎉')">🎉</button>
+        <button class="hype-btn" onclick="sendHype('😂')">😂</button>
+    </div>
+
     <!-- Socket.io -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=30"></script>
 </body>
 
 </html>
