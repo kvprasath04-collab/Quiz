@@ -464,10 +464,16 @@ app.post('/api/upload-pdf', upload.single('pdf'), async (req, res) => {
 
         console.log(`Extraction Request: From Page ${fromPage} to ${toPage}`);
         
+        let extracted = [];
         let options = {
             pagerender: function(pageData) {
                 const currentPage = pageData.pageIndex + 1;
                 
+                // Stop rendering if we already have enough trivia (e.g. 50 facts)
+                if (extracted.length >= 50) {
+                    return Promise.resolve("");
+                }
+
                 if (currentPage >= fromPage && currentPage <= toPage) {
                     console.log(`[Trivia Engine] Extracting Text from Page ${currentPage}...`);
                     return pageData.getTextContent().then(function(textContent) {
@@ -485,41 +491,35 @@ app.post('/api/upload-pdf', upload.single('pdf'), async (req, res) => {
                             lastY = item.transform[5];
                             lastX = item.transform[4] + (item.width || 0);
                         }
-                        return text;
+                        
+                        // Process this page's text immediately to see if we hit the limit
+                        const cleanText = text.replace(/\s+/g, ' ').trim();
+                        const sentences = cleanText.split(/(?<=[.!?])\s+/);
+                        
+                        for(let s of sentences) {
+                            if (extracted.length >= 50) break;
+                            let clean = s.replace(/[\n\r]/g, ' ').trim();
+                            // Filter for quality trivia sentences
+                            if (clean.length > 30 && clean.length < 150) {
+                                extracted.push(clean);
+                            }
+                        }
+                        
+                        return ""; // Returning empty string to keep memory usage low as we already stored facts in 'extracted'
                     });
                 }
-                // Important: Return a resolved empty string for pages outside the range
                 return Promise.resolve("");
             }
         };
 
-        const data = await pdfParse(req.file.buffer, options);
-        // Replace all whitespace sequences (including newlines) with a single space
-        // This is critical to fix the "word clumping" issue where spaces are lost
-        const text = data.text.replace(/\s+/g, ' ').trim();
-        
-        if (!text || text.trim().length === 0) {
-            throw new Error('PDF appears to be empty or contains no extractable text.');
-        }
-
-        // Split by sentences using naive regex
-        const sentences = text.split(/(?<=[.!?])\s+/);
-        let extracted = [];
-        
-        for(let s of sentences) {
-            let clean = s.replace(/[\n\r]/g, ' ').trim();
-            // Filter out numbers/titles/gibberish by picking solid middle-length string
-            if (clean.length > 30 && clean.length < 150) {
-                extracted.push(clean);
-            }
-        }
+        await pdfParse(req.file.buffer, options);
         
         if (extracted.length === 0) {
             throw new Error('Could not find any suitable trivia sentences in this PDF.');
         }
 
-        // Shuffle and limit to 100 maximum
-        extracted = extracted.sort(() => 0.5 - Math.random()).slice(0, 100);
+        // Shuffle the extracted trivia
+        extracted = extracted.sort(() => 0.5 - Math.random());
         
         triviaHints = extracted;
         saveState();
