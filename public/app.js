@@ -438,26 +438,23 @@ function showHype(emoji) {
 function renderPodium(leaderboard) {
     if (!podiumContainer) return;
     
-    const top3 = leaderboard.slice(0, 3);
-    if (top3.length === 0) {
-        podiumContainer.innerHTML = '';
+    // Take top 5 for better visibility on student side
+    const topPerformers = leaderboard.slice(0, 5);
+    if (topPerformers.length === 0) {
+        podiumContainer.innerHTML = '<div class="empty-state">Waiting for results...</div>';
         return;
     }
 
     let html = '';
-    // Sort for visual display 2nd, 1st, 3rd
-    const displayOrder = [];
-    if (top3[1]) displayOrder.push({ ...top3[1], rank: 2 });
-    if (top3[0]) displayOrder.push({ ...top3[0], rank: 1 });
-    if (top3[2]) displayOrder.push({ ...top3[2], rank: 3 });
-
-    displayOrder.forEach(player => {
+    
+    topPerformers.forEach((player, index) => {
+        const rank = index + 1;
         html += `
-            <div class="podium-item rank-${player.rank}">
-                <div class="podium-rank">#${player.rank}</div>
+            <div class="podium-item rank-${rank}">
+                <div class="podium-rank">#${rank}</div>
                 <div class="podium-avatar">${getAvatarEmoji(player.phone || player.name)}</div>
-                <div class="podium-bar">${player.score}</div>
                 <div class="podium-name">${player.name}</div>
+                <div class="podium-score">${player.score} <span style="font-size: 0.7rem; color: #64748b;">pts</span></div>
             </div>
         `;
     });
