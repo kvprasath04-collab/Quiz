@@ -31,6 +31,8 @@ const leaderboardList = document.getElementById('leaderboard-list');
 
 const pdfUploadInput = document.getElementById('pdf-upload');
 const uploadPdfBtn = document.getElementById('upload-pdf-btn');
+const confirmUploadBtn = document.getElementById('confirm-upload-btn');
+const selectedFileName = document.getElementById('selected-file-name');
 const pdfStatus = document.getElementById('pdf-status');
 
 const imagePreviewContainer = document.getElementById('image-preview-container');
@@ -388,8 +390,21 @@ uploadPdfBtn.addEventListener('click', () => {
     pdfUploadInput.click();
 });
 
-pdfUploadInput.addEventListener('change', async (e) => {
+pdfUploadInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
+    if (file) {
+        selectedFileName.textContent = `Selected: ${file.name}`;
+        selectedFileName.style.display = 'block';
+        confirmUploadBtn.style.display = 'block';
+        confirmUploadBtn.textContent = '✨ 2. Start Extraction';
+        confirmUploadBtn.disabled = false;
+        pdfStatus.style.display = 'none';
+        uploadPdfBtn.innerHTML = '📂 Change PDF File';
+    }
+});
+
+confirmUploadBtn.addEventListener('click', async () => {
+    const file = pdfUploadInput.files[0];
     if (!file) return;
 
     const fromPage = document.getElementById('pdf-from-page').value;
@@ -401,8 +416,8 @@ pdfUploadInput.addEventListener('change', async (e) => {
     if (toPage) formData.append('toPage', toPage);
     formData.append('password', passwordInput.value);
 
-    uploadPdfBtn.disabled = true;
-    uploadPdfBtn.textContent = '⏳ Extracting...';
+    confirmUploadBtn.disabled = true;
+    confirmUploadBtn.textContent = '⏳ Extracting...';
     pdfStatus.style.display = 'block';
     pdfStatus.textContent = 'Processing PDF text into trivia...';
     pdfStatus.style.color = '#94a3b8';
@@ -417,10 +432,13 @@ pdfUploadInput.addEventListener('change', async (e) => {
         if (response.ok) {
             pdfStatus.textContent = `✅ ${result.message}`;
             pdfStatus.style.color = 'var(--success)';
-            uploadPdfBtn.textContent = '📄 Extraction Complete';
+            confirmUploadBtn.textContent = '📄 Extraction Complete';
             setTimeout(() => {
-                uploadPdfBtn.disabled = false;
-                uploadPdfBtn.textContent = '📄 Choose PDF & Extract';
+                confirmUploadBtn.disabled = false;
+                confirmUploadBtn.style.display = 'none';
+                selectedFileName.style.display = 'none';
+                uploadPdfBtn.innerHTML = '📁 1. Click to Select PDF';
+                pdfUploadInput.value = ''; // Reset input
             }, 3000);
         } else {
             throw new Error(result.error || 'Upload failed');
@@ -428,8 +446,8 @@ pdfUploadInput.addEventListener('change', async (e) => {
     } catch (err) {
         pdfStatus.textContent = `❌ Error: ${err.message}`;
         pdfStatus.style.color = 'var(--error)';
-        uploadPdfBtn.disabled = false;
-        uploadPdfBtn.textContent = '📄 Choose PDF & Extract';
+        confirmUploadBtn.disabled = false;
+        confirmUploadBtn.textContent = '✨ 2. Start Extraction';
     }
 });
 
