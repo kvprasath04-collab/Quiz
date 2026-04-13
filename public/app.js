@@ -403,7 +403,7 @@ socket.on('leaderboard_update', (data) => {
         studentScore.textContent = `0 / ${totalQuestions}`;
     }
 
-    renderPodium(leaderboard);
+    renderPodium(leaderboard, totalQuestions);
 });
 
 socket.on('trivia_update', (hints) => {
@@ -435,26 +435,64 @@ function showHype(emoji) {
     setTimeout(() => el.remove(), 2500);
 }
 
-function renderPodium(leaderboard) {
+function renderPodium(leaderboard, totalQuestions) {
     if (!podiumContainer) return;
     
-    // Take top 5 for better visibility on student side
-    const topPerformers = leaderboard.slice(0, 5);
-    if (topPerformers.length === 0) {
+    // Requirement: Rank should be visible at least 3 questions asked
+    if (totalQuestions < 3) {
+        podiumContainer.innerHTML = '<div class="empty-state">Standings will be revealed after 3 questions.</div>';
+        return;
+    }
+
+    if (!leaderboard || leaderboard.length === 0) {
         podiumContainer.innerHTML = '<div class="empty-state">Waiting for results...</div>';
         return;
     }
 
+    // Group students by score to handle ties
+    const scoreGroups = {};
+    leaderboard.forEach(player => {
+        const score = player.score || 0;
+        if (!scoreGroups[score]) scoreGroups[score] = [];
+        scoreGroups[score].push(player);
+    });
+
+    // Sort unique scores descending
+    const sortedScores = Object.keys(scoreGroups)
+        .map(Number)
+        .sort((a, b) => b - a);
+
+    // Filter out 0 scores if there are higher scores available? 
+    // Usually if everyone is 0, they are all rank 1.
+    
+    // Take top 3 unique scores (ranks)
+    const topScores = sortedScores.slice(0, 3);
     let html = '';
     
-    topPerformers.forEach((player, index) => {
+    topScores.forEach((score, index) => {
         const rank = index + 1;
+        const group = scoreGroups[score];
+        
+        let nameDisplay = '';
+        let avatarDisplay = '';
+        
+        if (group.length === 1) {
+            // Single person at this score
+            nameDisplay = group[0].name;
+            avatarDisplay = getAvatarEmoji(group[0].phone || group[0].name);
+        } else {
+            // Multiple people at this score
+            // Requirement: "show 3 personse and the mark . Not the name"
+            nameDisplay = `${group.length} Persons`;
+            avatarDisplay = '👥';
+        }
+
         html += `
             <div class="podium-item rank-${rank}">
                 <div class="podium-rank">#${rank}</div>
-                <div class="podium-avatar">${getAvatarEmoji(player.phone || player.name)}</div>
-                <div class="podium-name">${player.name}</div>
-                <div class="podium-score">${player.score} <span style="font-size: 0.7rem; color: #64748b;">pts</span></div>
+                <div class="podium-avatar">${avatarDisplay}</div>
+                <div class="podium-name">${nameDisplay}</div>
+                <div class="podium-score">${score} <span style="font-size: 0.7rem; color: #64748b;">pts</span></div>
             </div>
         `;
     });
