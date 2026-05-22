@@ -7,6 +7,7 @@ let currentView = 'name-section';
 let timerInterval = null;
 let endTime = null;
 let hasAnsweredCurrentQuestion = false;
+let localHistory = [];
 
 // DOM Elements
 const sections = {
@@ -338,7 +339,8 @@ socket.on('current_state', (state) => {
     socket.emit('user_join_roster', { name: userName, phone: userPhone });
 
     if (state.history) {
-        renderHistory(state.history, userName);
+        localHistory = state.history;
+        renderHistory(localHistory, userName);
     }
 
     if (state.triviaHints) {
@@ -363,7 +365,8 @@ socket.on('new_question', (data) => {
     if (!userName) return; // Haven't joined yet
 
     if (data.history) {
-        renderHistory(data.history, userName);
+        localHistory = data.history;
+        renderHistory(localHistory, userName);
     }
 
     hasAnsweredCurrentQuestion = false;
@@ -518,6 +521,20 @@ function startTriviaRotation() {
 }
 
 socket.on('response_marked', ({ responseId, isCorrect, phone }) => {
+    // Update local history copy
+    let historyChanged = false;
+    localHistory.forEach(session => {
+        const hResp = session.responses.find(r => r.responseId === responseId);
+        if (hResp) {
+            hResp.isCorrect = isCorrect;
+            historyChanged = true;
+        }
+    });
+
+    if (historyChanged) {
+        renderHistory(localHistory, userName);
+    }
+
     if (userName && userPhone && phone === userPhone) {
         // Reaction logic
         if (isCorrect === true) {

@@ -156,10 +156,16 @@
                             id="response-count">0</span>)</button>
                     <button class="tab-btn" onclick="switchAdminTab('history')">Session History</button>
                 </div>
-                <label style="font-size: 0.85rem; color: #cbd5e1; display:flex; align-items: center; gap: 0.5rem; padding-right: 1rem; cursor: pointer;">
-                   <input type="checkbox" id="filter-correct-btn" style="accent-color: #10b981;"> 
-                   Show only correct
-                </label>
+                <div style="display: flex; gap: 1rem; align-items: center;">
+                    <label style="font-size: 0.85rem; color: #cbd5e1; display:flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                       <input type="checkbox" id="filter-correct-btn" style="accent-color: #10b981;"> 
+                       Show only correct
+                    </label>
+                    <label style="font-size: 0.85rem; color: #cbd5e1; display:flex; align-items: center; gap: 0.5rem; padding-right: 1rem; cursor: pointer;">
+                       <input type="checkbox" id="filter-pending-btn" style="accent-color: #f59e0b;"> 
+                       Show only pending
+                    </label>
+                </div>
             </div>
 
             <!-- Live Tab Content -->

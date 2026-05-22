@@ -52,9 +52,11 @@ function getAvatarEmoji(str) {
 const removeImageBtn = document.getElementById('remove-image-btn');
 const currentActiveImage = document.getElementById('current-active-image');
 const filterCorrectBtn = document.getElementById('filter-correct-btn');
+const filterPendingBtn = document.getElementById('filter-pending-btn');
 
 let currentImageBase64 = null;
 let showOnlyCorrect = false;
+let showOnlyPending = false;
 
 let currentResponses = [];
 let adminTimerInterval = null;
@@ -149,19 +151,43 @@ removeImageBtn.addEventListener('click', () => {
 if (filterCorrectBtn) {
     filterCorrectBtn.addEventListener('change', (e) => {
         showOnlyCorrect = e.target.checked;
+        if (showOnlyCorrect && filterPendingBtn) {
+            filterPendingBtn.checked = false;
+            showOnlyPending = false;
+        }
+        updateResponsesList();
+    });
+}
+
+if (filterPendingBtn) {
+    filterPendingBtn.addEventListener('change', (e) => {
+        showOnlyPending = e.target.checked;
+        if (showOnlyPending && filterCorrectBtn) {
+            filterCorrectBtn.checked = false;
+            showOnlyCorrect = false;
+        }
         updateResponsesList();
     });
 }
 
 function updateResponsesList() {
-    const filteredResponses = showOnlyCorrect 
-        ? currentResponses.filter(r => r.isCorrect === true) 
-        : currentResponses;
+    let filteredResponses = currentResponses;
+    if (showOnlyCorrect) {
+        filteredResponses = currentResponses.filter(r => r.isCorrect === true);
+    } else if (showOnlyPending) {
+        filteredResponses = currentResponses.filter(r => r.isCorrect === null || r.isCorrect === undefined);
+    }
 
     responseCountEl.textContent = filteredResponses.length;
 
     if (filteredResponses.length === 0) {
-        responsesList.innerHTML = `<div class="empty-state">${showOnlyCorrect ? 'No responses marked as correct yet.' : 'No responses yet. Waiting for answers...'}</div>`;
+        let emptyMessage = 'No responses yet. Waiting for answers...';
+        if (showOnlyCorrect) {
+            emptyMessage = 'No responses marked as correct yet.';
+        } else if (showOnlyPending) {
+            emptyMessage = 'No pending responses left.';
+        }
+        responsesList.innerHTML = `<div class="empty-state">${emptyMessage}</div>`;
         return;
     }
 
@@ -196,6 +222,20 @@ window.markResponse = function (responseId, isCorrect) {
     if (target) {
         target.isCorrect = isCorrect;
         updateResponsesList(); 
+    }
+
+    // Also optimistically update session history
+    let historyChanged = false;
+    fullHistory.forEach(session => {
+        const hResp = session.responses.find(r => r.responseId === responseId);
+        if (hResp) {
+            hResp.isCorrect = isCorrect;
+            historyChanged = true;
+        }
+    });
+
+    if (historyChanged) {
+        renderAdminHistory();
     }
 
     socket.emit('admin_mark_response', {
@@ -265,7 +305,17 @@ function renderAdminHistory() {
                         <td style="color: #94a3b8;">${escapeHTML(resp.name)}</td>
                         <td style="color: #f8fafc;">
                             <div style="margin-bottom: 0.5rem; white-space: pre-wrap; word-break: break-word;">${escapeHTML(resp.answer)}</div>
-                            <div class="status-badge ${resp.isCorrect === true ? 'correct' : (resp.isCorrect === false ? 'incorrect' : 'pending')}">${resp.isCorrect === true ? 'Correct' : (resp.isCorrect === false ? 'Incorrect' : 'Pending')}</div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                <div class="status-badge ${resp.isCorrect === true ? 'correct' : (resp.isCorrect === false ? 'incorrect' : 'pending')}">${resp.isCorrect === true ? 'Correct' : (resp.isCorrect === false ? 'Incorrect' : 'Pending')}</div>
+                                <div class="mark-btn-container" style="margin-top: 0; display: inline-flex; gap: 0.25rem;">
+                                    <button class="mark-btn correct ${resp.isCorrect === true ? 'active' : ''}" 
+                                        style="padding: 0.2rem 0.5rem; font-size: 0.7rem; border-radius: 0.25rem; line-height: 1;"
+                                        onclick="markResponse('${resp.responseId}', ${resp.isCorrect === true ? 'null' : 'true'})">✅</button>
+                                    <button class="mark-btn incorrect ${resp.isCorrect === false ? 'active' : ''}" 
+                                        style="padding: 0.2rem 0.5rem; font-size: 0.7rem; border-radius: 0.25rem; line-height: 1;"
+                                        onclick="markResponse('${resp.responseId}', ${resp.isCorrect === false ? 'null' : 'false'})">❌</button>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                 `;
